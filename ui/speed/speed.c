@@ -1,6 +1,6 @@
 /* UI speed test (A1): runs once, after the 150th screen update following boot. Pushes known numbers of frames so a
- * stopwatch gives frames/s:  RED screen (20 frames) -> 300 full frames of Mulberry -> GREEN (20) -> 1 Cloudberry
- * frame + 2000 tile pushes (32x48) -> BLUE (20) -> memory probe colour (60 frames) -> normal firmware continues.
+ * stopwatch gives frames/s:  RED screen (20 frames) -> 30 full frames of Mulberry -> GREEN (20) -> 1 Cloudberry
+ * frame + 300 tile pushes (32x48) -> BLUE (20) -> memory probe colour (60 frames) -> normal firmware continues.
  * Called instead of the LCD flush from the theme hook; ends by calling the real flush with the same arguments. */
 #include "img.h"
 typedef void (*flush_fn)(int, int, int, int, u16 *);
@@ -37,14 +37,14 @@ static void bench(void)
     buf = (u16 *)MALLOC(16 * 160 * 2);
     if (!buf) return;
     solid(SW(0xF800), 20);
-    for (int i = 0; i < 300; i++) frame(IMG0);
+    for (int i = 0; i < 30; i++) frame(IMG0);
     solid(SW(0x07E0), 20);
     frame(IMG1);
-    for (int i = 0; i < 2000; i++) { int x = i % 256; x = x < 128 ? x : 255 - x; tile(IMG0, x, 40); }
+    for (int i = 0; i < 300; i++) { int x = i % 256; x = x < 128 ? x : 255 - x; tile(IMG0, x, 40); }
     solid(SW(0x001F), 20);
     /* free memory probe (test build only, not freed): last colour = largest block we could get:
        WHITE 64 KB, CYAN 32 KB, YELLOW 16 KB, MAGENTA less */
-    u16 c = MALLOC(65536) ? 0xFFFF : MALLOC(32768) ? 0x07FF : MALLOC(16384) ? 0xFFE0 : 0xF81F;
+    u16 c = MALLOC(16384) ? 0x07FF : MALLOC(8192) ? 0xFFE0 : 0xF81F;   /* CYAN 16 KB, YELLOW 8 KB, MAGENTA less */
     solid(SW(c), 60);
     frame(IMG0);
 }

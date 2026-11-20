@@ -958,3 +958,14 @@ MCU app +50 KB (UI, MIDI, scenes …), effect DB rewritten (new names/knobs).
   knob plays exactly (comb corr 0.99), factory cab 1 plays, live switching works. The IR BLOCK itself must stay
   off in NAM presets: with our clone, IR block ON -> digital silence that persists (CFW IR-after-clone writes the
   cab area). UI must show the clone's Cab knob as the "IR" of a NAM and keep the real IR block off.
+- 2026-11-21 03:3x: speed test ui3 (300 full frames + 2000 tiles + 64 KB malloc probe, run inside the flush hook
+  = GUI task) left the pedal unresponsive (no USB audio/SysEx, then it dropped off USB). Recovered via the button
+  combo (USB unplugged, combo, screen lit, then cable) + pmflash of clone5; P08 restored, audio OK.
+  Likely cause: the GUI task blocked for minutes (and/or the big malloc). Next try: 30 frames + 300 tiles, 16 KB
+  probe max. Never cancel a running reflash command.
+- The updater refuses an MCU section of 0x17C1B4 bytes (ui3b, 2 test images): NAK 14 08 01 at the section-b header,
+  twice; clone5 (0x167F50) flashes fine. So the MCU section has a size limit somewhere between 0x168056 (ui2, OK)
+  and 0x17C1B4 - test images must be dropped; the real UI must find the exact limit (or keep its data elsewhere).
+- MCU section size limit measured with tools/size_probe.py (clone5 + padding): +0x8000, +0x10000, +0x12000,
+  +0x13000, +0x14000 (section 0x17BF50) all flash and boot; 0x17C1B4 is refused. Usable UI space = 0x17BF50 - 0x168000
+  = 79.8 KB (not 96 KB). Pedal restored to clone5, P08 restored, audio OK (-31 dB).

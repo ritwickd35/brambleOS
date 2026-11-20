@@ -150,7 +150,9 @@ Everything below was worked out on the stock/CFW 1.0.2 MCU app (`cfw/mcu_cfw.dis
   Flash with the user present (note: every flash resets presets from the image; P08 restore needed).
 
 ### Resource budget (checked 2026-11-21) - must stay within these
-- **Flash for our UI: 96 KB** (0x168000-0x17FFFF). Estimate: code ~35 KB, fonts ~7 KB (7 px + 10 px text, 2 bpp
+- **Flash for our UI: 79.8 KB, measured** (flash 0x168000 .. 0x17BF50). The updater accepts an MCU section up to
+  0x17BF50 bytes (tested: +32/64/72/76/80 KB padding OK) and REFUSES 0x17C1B4 (NAK at the section header); the
+  limit is probably 0x17C000. (The earlier 96 KB figure was wrong: the pad probes are tools/size_probe.py.) Estimate: code ~35 KB, fonts ~7 KB (7 px + 10 px text, 2 bpp
   anti-aliased; big digits/note letters 2 bpp), gear art ~57 KB raw -> **must be compressed** (RLE on 4 bpp,
   transparent background compresses well, target ~38 KB) => ~80 KB total, ~15 KB margin.
   Art plan: 126 effects + 16 cabs + NAM. Small 28x24 4 bpp (336 B) as ~70 shared shapes (effect families) + a
