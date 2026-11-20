@@ -969,3 +969,10 @@ MCU app +50 KB (UI, MIDI, scenes …), effect DB rewritten (new names/knobs).
 - MCU section size limit measured with tools/size_probe.py (clone5 + padding): +0x8000, +0x10000, +0x12000,
   +0x13000, +0x14000 (section 0x17BF50) all flash and boot; 0x17C1B4 is refused. Usable UI space = 0x17BF50 - 0x168000
   = 79.8 KB (not 96 KB). Pedal restored to clone5, P08 restored, audio OK (-31 dB).
+- SPEED TEST RESULT (ui3d, user stopwatch, 2026-11-21): 300 full-screen redraws (8 strips of 160x16, pattern computed
+  per pixel in C) = about 1 s -> ~3 ms per full frame incl. our own per-pixel maths; 3000 tile pushes (32x48,
+  per-pixel computed) = about 3.5 s -> ~1.2 ms per 32x48 tile. => the LCD path is fast; animations are cheap.
+  Memory probe: a 16 KB malloc succeeds (CYAN) after boot with our 5 KB strip buffer already taken => free heap
+  >= 16 KB (32 KB probe not tried in the final version). The test then left the pedal not answering USB: most
+  likely the leaked probe block exhausted the heap for the GUI/USB tasks (never leak; free probes). Design rule:
+  strip buffer 160x8 (2.5 KB), total UI heap < 8 KB, allocate once at start, never in the draw loop.
