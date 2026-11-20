@@ -1,0 +1,6 @@
+FROM debian:stable
+RUN apt-get update -qq && apt-get install -y -qq build-essential wget texinfo bison flex python3 xz-utils libgmp-dev >/dev/null
+RUN wget -q https://ftp.gnu.org/gnu/binutils/binutils-2.42.tar.xz && tar xf binutils-2.42.tar.xz && cd binutils-2.42 && \
+    ./configure -q --target=nds32le-elf --prefix=/opt/nds --disable-nls --disable-werror --disable-gdb --disable-gprofng >/dev/null && \
+    make -s -j8 >/dev/null 2>&1 && make -s install >/dev/null 2>&1 && cd / && rm -rf binutils-2.42*
+ENV PATH=/opt/nds/bin:$PATH

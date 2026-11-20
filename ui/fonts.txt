@@ -1,0 +1,7 @@
+font desc file 1196476 cpu 1262012 line_height 11 base_line 2 dsc 1262040
+font desc file 1212864 cpu 1278400 line_height 49 base_line 8 dsc 1278428
+font desc file 1219616 cpu 1285152 line_height 12 base_line 2 dsc 1285180
+font desc file 1220884 cpu 1286420 line_height 19 base_line 3 dsc 1286448
+font desc file 1222732 cpu 1288268 line_height 24 base_line 4 dsc 1288296
+font desc file 1225708 cpu 1291244 line_height 16 base_line 3 dsc 1291272
+font desc file 1239348 cpu 1304884 line_height 10 base_line 2 dsc 1304912

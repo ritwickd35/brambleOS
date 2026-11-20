@@ -1,0 +1,16 @@
+register window 182724 cb ['0x28d14', '0x29220', '0x292dc'] at 2c2e0
+register window 182724 cb ['0x23c84', '0x23d38', '0x23d7c'] at 2c2f2
+register window None cb ['0x262e8', '0x266ec', '0x26728'] at 2c304
+register window None cb ['0x1a9b4', '0x1bf60', '0x1bf98'] at 2c316
+register window None cb ['0x22e80', '0x233e8', '0x23440'] at 2c328
+register window None cb ['0x2a270', '0x2b41c', '0x2b458'] at 2c33a
+register window None cb ['0x27998', '0x28100', '0x28184'] at 2c34c
+register window None cb ['0x23efc', '0x23f90', '0x23fcc'] at 2c35e
+register window None cb ['0x1ff48', '0x200e4', '0x20120'] at 2c370
+register window None cb ['0x24e9c', '0x260e0', '0x26118'] at 2c394
+register window None cb ['0x2118c', '0x222ac', '0x222fc'] at 2c3a6
+register window None cb ['0x20234', '0x203c0', '0x203fc'] at 2c3b8
+register window None cb ['0x238b0', '0x23b6c', '0x23ba4'] at 2c3ca
+register window None cb ['0x23674', '0x236e4', '0x2371c'] at 2c3dc
+register window 15 cb ['0x1fb30', '0x1fd78', '0x1fdb4'] at 2c3f0
+register window 15 cb ['0x19974', '0x1a2b8', '0x1a33c'] at 2c402

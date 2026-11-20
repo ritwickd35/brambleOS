@@ -1,0 +1,51 @@
+# large, generated, third-party or personal data (kept locally, not in git)
+audio/
+guitar_di/
+build/
+backups/
+unpacked/
+cut1/
+logs/
+midi logs/
+nams/
+nams2/
+irs/
+clones_sonicake/
+tools/.venv/
+ui/nds/
+ui/lvgl/
+ui/lvgl7/
+ui/export/
+ui/speed/img.h
+ui/hello/*.o
+__pycache__/
+.DS_Store
+*.dis
+*.bin
+*.elf
+*.o
+*.sym
+*.wav
+*.f32
+*.npy
+*.nam
+*.clo
+# not for a public repo: third-party text / data derived from Sonicake firmware or third-party captures
+cfw/cfw_manual.txt
+cfw/engine_progs.txt
+cfw/modules.txt
+cfw/modules-stock.txt
+amps/nam_*
+amps/namx_*
+clones/
+clones3/
+clones4/
+clonesx/
+# compiled host helpers
+dsp/ampdump
+dsp/dl_host
+dsp/dumpcoefs
+dsp/host
+dsp/host_*
+dsp/opc
+dsp/rv_host

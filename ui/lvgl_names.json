@@ -1,0 +1,22 @@
+{
+"0x2e7c0": [
+"lv_obj_is_editable",
+0.5
+],
+"0x2efb4": [
+"lv_obj_get_scroll_dir",
+0.67
+],
+"0x30dbc": [
+"lv_obj_get_scroll_dir",
+0.67
+],
+"0x35170": [
+"lv_img_cf_get_px_size",
+0.67
+],
+"0x43f84": [
+"_lv_area_is_in",
+0.49
+]
+}
