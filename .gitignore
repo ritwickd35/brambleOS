@@ -49,3 +49,4 @@ dsp/host
 dsp/host_*
 dsp/opc
 dsp/rv_host
+ui/src/font_data.h

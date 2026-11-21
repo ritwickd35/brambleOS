@@ -10,7 +10,7 @@ GCC = "/out/bin/nds32le-elf-"; BIN = "/opt/nds/bin/nds32le-elf-"      # compiler
 def main():
     base, name, srcdir = sys.argv[1:4]; srcdir = os.path.abspath(srcdir)
     subprocess.run(["docker", "run", "--rm", "-v", f"{srcdir}:/w", "-v", f"{os.path.join(RE, 'ui', 'nds')}:/out", "-w", "/w", "pmre", "sh", "-c",
-        f"export PATH=/opt/nds/bin:$PATH; for f in *.c; do {GCC}gcc -Os -ffreestanding -fno-builtin -nostdlib -c $f -o ${{f%.c}}.o || exit 1; done; "
+        f"export PATH=/opt/nds/bin:$PATH; for f in *.c; do {GCC}gcc -Os $(cat cflags 2>/dev/null) -ffreestanding -fno-builtin -nostdlib -c $f -o ${{f%.c}}.o || exit 1; done; "
         f"{BIN}ld -T link.ld *.o -o ui.elf && {BIN}objcopy -O binary ui.elf ui.bin && {BIN}nm ui.elf > ui.sym"], check=True)
     code = open(os.path.join(srcdir, "ui.bin"), "rb").read(); sym = {l.split()[2]: int(l.split()[0], 16) for l in open(os.path.join(srcdir, "ui.sym")) if len(l.split()) == 3}
     out = os.path.join(RE, "build", name); shutil.rmtree(out, ignore_errors=True); shutil.copytree(os.path.join(RE, base) if not os.path.isabs(base) else base, out)

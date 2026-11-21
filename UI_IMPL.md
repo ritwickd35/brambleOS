@@ -166,3 +166,8 @@ Everything below was worked out on the stock/CFW 1.0.2 MCU app (`cfw/mcu_cfw.dis
 - **CPU**: shapes drawn procedurally (rounded rects, rings, bars, gradient + dither) per changed rectangle only;
   full-screen redraw only on screen change. Frame time measured by the speed test before animations are built.
 - **Readability**: minimum text 7 px (the 6 px hint lines in the mock-ups are too small: make them 7 px or drop).
+
+## Window ids measured on the pedal (ui5 overlay, user-read)
+Home 02, push-and-hold 05, effects edit 10, settings 04, drum 06, tuner 03, recorder 09, off-state charging 13. (Earlier guesses from code layout were wrong.) Theme byte read 1 on the test pedal.
+ui4 (float gfx + state at 0x2001BC00) hung on the home screen; ui5 (integer only, no globals) is stable.
+ui6 (float gfx, state on stack + r10, -ffixed-$r10) stable: the hang was the RAM address 0x2001BC00. No known-free MCU RAM; keep state on stack/r10.

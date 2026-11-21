@@ -976,3 +976,7 @@ MCU app +50 KB (UI, MIDI, scenes …), effect DB rewritten (new names/knobs).
   >= 16 KB (32 KB probe not tried in the final version). The test then left the pedal not answering USB: most
   likely the leaked probe block exhausted the heap for the GUI/USB tasks (never leak; free probes). Design rule:
   strip buffer 160x8 (2.5 KB), total UI heap < 8 KB, allocate once at start, never in the draw loop.
+- 2026-11-21 UI: the MCU section limit measured with 0xFF padding (0x17BF50) does NOT hold for real code: ui12 with
+  0x171828 bytes (39 KB UI code) was refused twice at the section-b header (NAK 14 08 01); after removing duplicated
+  font data (29 KB, section 0x16F1C4) it flashed. Real limit unknown, between 0x16F1C4 (OK) and 0x171828 (refused);
+  keep the UI code under ~29 KB until measured with real data. (Pedal stays in update mode on a refusal; reflash.)

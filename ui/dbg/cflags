@@ -1,0 +1,1 @@
+-DPEDAL -mext-fpu-sp -ffixed-$r10
