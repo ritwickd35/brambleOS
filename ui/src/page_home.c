@@ -6,7 +6,7 @@ void battery(float x, float y, int pct, int chg)
 {
     const theme_t *t = gfx_theme(); gfx_rrect(x, y, 15, 8, 2.5f, t->sub, 0.85f); gfx_rrect(x + 1.5f, y + 1.5f, 12, 5, 1.3f, t->track, 1);
     float w = 12 * pct / 100.0f; if (w < 2.6f) w = 2.6f; gfx_rrect(x + 1.5f, y + 1.5f, w, 5, 1.3f, pct > 25 ? t->on : t->warn, 1); gfx_rrect(x + 15, y + 2.5f, 1.8f, 3, 0.9f, t->sub, 0.85f);
-    if (chg) gfx_tri(x + 8, y + 1, x + 5, y + 4.6f, x + 8.4f, y + 3.8f, RGB(255, 255, 255), 0.9f);
+    if (chg) { rgb_t c = RGB(255, 214, 64); gfx_tri(x - 3, y - 1, x - 7.5f, y + 4.6f, x - 4.2f, y + 4.2f, c, 1); gfx_tri(x - 4.8f, y + 3.6f, x - 5.8f, y + 9.4f, x - 1.4f, y + 3.4f, c, 1); }
 }
 void speaker(float x, float y, rgb_t c)
 {
@@ -22,12 +22,11 @@ static void ring(float cx, float cy, float r, int v, rgb_t c)
     gfx_disc(cx, cy - r, 1.3f, c, 1); gfx_disc(cx + r * gfx_sin(e + 90), cy + r * gfx_sin(e), 1.3f, c, 1);
 }
 static void load_rings(float cx, float cy, int cpu, int eng)
-{   /* rings only; one quiet line of numbers below, each in its ring's colour (outer = CPU, inner = engine) */
-    const theme_t *t = gfx_theme(); char a[8], b[8]; rgb_t cc = cpu > 84 ? t->warn : t->on, ec = eng > 84 ? t->warn : t->ring;
+{   /* outer ring = DSP CPU, inner ring = audio engine; a ring turns red above 85 %. No numbers here (no room to say which
+     * is which); the exact values belong on a page with space. */
+    const theme_t *t = gfx_theme(); rgb_t cc = cpu > 84 ? t->warn : t->on, ec = eng > 84 ? t->warn : t->ring;
     ring(cx, cy, 8.5f, cpu, cc); ring(cx, cy, 4.8f, eng, ec);
-    if (cpu >= 0) num(a, cpu, ""); else { a[0] = '-'; a[1] = 0; } if (eng >= 0) num(b, eng, ""); else { b[0] = '-'; b[1] = 0; }
-    float wa = gfx_text_w(&FONT7, a), wb = gfx_text_w(&FONT7, b), x = cx - (wa + 5 + wb) * 0.5f;
-    gfx_text(x, 117, a, &FONT7, cc, "lm", 1); gfx_disc(x + wa + 2.5f, 117, 0.9f, t->sub, 0.7f); gfx_text(x + wa + 5, 117, b, &FONT7, ec, "lm", 1);
+    gfx_text(cx, 118, "LOAD", &FONT7, (cpu > 84 || eng > 84) ? t->warn : t->sub, "mm", 1);
 }
 void page_home(const model_t *m)
 {
@@ -45,8 +44,8 @@ void page_home(const model_t *m)
     gfx_tray(1, 41, 158, 43, 1, 41, 126, 84, 7, t->dark ? RGB(20, 0, 24) : t->text, t->dark ? 0.30f : 0.07f);
     for (int i = 0; i < 9; i++) {
         float x = 3 + (i % 5) * 31, y = 44 + (i / 5) * 42;
-        int lit = m->on[i]; gfx_tile(x, y, 26, 26, lit, i == m->sel, 5); sprite(i, x - 1, y + 0.5f, lit, i == 3 ? m->nam : 0); gfx_led(x + 23, y + 3, lit);
-        gfx_text(x + 13, y + 27, (i == 3 && m->nam) ? "NAM" : lab[i], &FONT7, lit ? t->text : t->sub, "mt", lit ? 1 : 0.55f);
+        int k = m->order[i] < 9 ? m->order[i] : i, lit = m->on[k]; gfx_tile(x, y, 26, 26, lit, k == m->sel, 5); sprite(k, x - 1, y + 0.5f, lit, k == 3 ? m->nam : 0); gfx_led(x + 23, y + 3, lit);
+        gfx_text(x + 13, y + 27, (k == 3 && m->nam) ? "NAM" : lab[k], &FONT7, lit ? t->text : t->sub, "mt", lit ? 1 : 0.55f);
     }
     load_rings(143, 101, m->cpu, m->eng);
 }

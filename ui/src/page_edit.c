@@ -12,10 +12,14 @@ void page_edit(const model_t *m)
     if (m->edited) gfx_text(35 + gfx_text_w(&FONT9, m->name) + 2, 9, "*", &FONT9, t->sub, "lm", 1);
     /* block strip: 9 mini squares in chain order (gear colour when on, empty slot when off); the edited one ringed */
     static const rgb_t GC[9] = {{40, 90, 170}, {40, 140, 80}, {200, 50, 50}, {220, 170, 60}, {70, 60, 50}, {60, 55, 70}, {190, 130, 40}, {50, 130, 220}, {140, 90, 210}};
-    for (int i = 0; i < 9; i++) { float x = 4 + i * 17; int s = i == m->sel;
-        gfx_tile(x, 20, 15, 13, m->on[i], s, 3); if (m->on[i]) gfx_rrect(x + 3, 23, 9, 7, 2, GC[i], 1); }
+    for (int j = 0; j < 9; j++) { int i = m->order[j] < 9 ? m->order[j] : j; float x = 4 + j * 17; int s = i == m->sel, on = m->on[i]; rgb_t c = GC[i];
+        if (!on) { int l = (c.r * 3 + c.g * 6 + c.b) / 10; l = t->dark ? l * 30 / 100 + 34 : l / 6 + 190; c = RGB(l, l * 9 / 10, l); }
+        if (s) { gfx_rrect(x - 2, 18, 19, 17, 5, t->ring, 0.3f); gfx_rrect(x - 1, 19, 17, 15, 4, t->ring, 1); }
+        gfx_rrect(x, 20, 15, 13, 3, c, 1); if (on) gfx_rrect(x + 1, 21, 13, 5, 2, RGB(255, 255, 255), 0.18f);
+        gfx_text(x + 7.5f, 26.5f, LAB[i], &FONT8, on ? RGB(255, 255, 255) : (t->dark ? RGB(150, 130, 150) : RGB(120, 110, 115)), "mm", 1); }
     /* model card */
     int sel = m->sel < 0 ? 0 : m->sel, on = m->on[sel];
+    if (m->ksel < 0) { gfx_rrect(2, 36, 156, 44, 9, t->ring, 0.35f); gfx_rrect(3, 37, 154, 42, 8, t->ring, 1); }      /* frame on the block */
     gfx_tray(4, 38, 152, 40, 4, 38, 152, 40, 7, t->dark ? RGB(20, 0, 24) : t->text, t->dark ? 0.30f : 0.07f);
     gfx_tile(8, 42, 32, 32, on, 0, 6); sprite(sel, 11, 45, on, sel == 3 ? m->nam : 0);
     gfx_text(46, 45, LAB[sel], &FONT7, t->sub, "lm", 1); gfx_text(46, 56, m->mname, gfx_text_w(&FONT16, m->mname) <= 76 ? &FONT16 : &FONT12, t->text, "lm", 1);
@@ -24,8 +28,8 @@ void page_edit(const model_t *m)
     if (sel == 3) { gfx_rrect(118, 61, 34, 12, 6, t->track, 1); gfx_rrect(m->nam ? 135 : 119, 62, 16, 10, 5, t->ring, 1);
         gfx_text(127, 67, "B", &FONT7, m->nam ? t->sub : t->ink, "mm", 1); gfx_text(143, 67, "N", &FONT7, m->nam ? t->ink : t->sub, "mm", 1); }
     /* knobs: 4 per page, rings with value; the highlighted one in the accent colour */
-    int page = m->ksel / 4, n = m->nk - page * 4; if (n > 4) n = 4;
-    for (int k = 0; k < n; k++) { int i = page * 4 + k, hl = i == m->ksel; float cx = 22 + 39 * k, cy = 96; rgb_t c = hl ? t->ring : t->sub;
+    int page = m->ksel < 0 ? 0 : m->ksel / 4, n = m->nk - page * 4; if (n > 4) n = 4;
+    for (int k = 0; k < n; k++) { int i = page * 4 + k, hl = i == m->ksel; float cx = 22 + 39 * k, cy = 96; rgb_t c = hl ? t->ring : t->sub; if (hl) { gfx_rrect(cx - 18, 82, 36, 37, 8, t->ring, 0.22f); }
         gfx_arc(cx, cy, 11, 3, 135, 45, t->track, 1); if (m->kv[i] > 0) gfx_arc(cx, cy, 11, 3, 135, 135 + 2.7f * m->kv[i], c, 1);
         itoa2(m->kv[i], b); gfx_text(cx, cy, b, &FONT9, hl ? t->text : t->sub, "mm", 1); gfx_text(cx, 113, m->kn[i], &FONT7, c, "mm", 1); }
     if (m->nk > 4) for (int p = 0; p * 4 < m->nk; p++) gfx_disc(80 - 3 * ((m->nk + 3) / 4 - 1) + 6 * p, 122, 1.5f, p == page ? t->ring : t->track, 1);

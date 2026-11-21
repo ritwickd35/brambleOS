@@ -6,6 +6,7 @@ typedef struct {
     int vol, bt, bat, chg;  /* -1 = not known (element not drawn) */                         /* master volume 0..100, Bluetooth on, battery 0..100, charging */
     int cpu, eng, bpm;                              /* DSP load %, engine load %, tempo */
     u8 on[9];                                       /* NR FX1 DRV AMP IR EQ FX2 DLY RVB : block enabled */
+    u8 order[9];                                    /* chain order: order[slot] = block (0..8) */
     int sel; int nam;                               /* selected block (0..8); AMP block is a NAM clone */
     /* edit page (selected block = sel) */
     char mname[20], brand[24]; int nk; char kn[8][6]; int kv[8]; int ksel;   /* model, maker/original, knobs 0..100 */

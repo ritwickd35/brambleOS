@@ -980,3 +980,5 @@ MCU app +50 KB (UI, MIDI, scenes …), effect DB rewritten (new names/knobs).
   0x171828 bytes (39 KB UI code) was refused twice at the section-b header (NAK 14 08 01); after removing duplicated
   font data (29 KB, section 0x16F1C4) it flashed. Real limit unknown, between 0x16F1C4 (OK) and 0x171828 (refused);
   keep the UI code under ~29 KB until measured with real data. (Pedal stays in update mode on a refusal; reflash.)
+- 2026-11-22: MCU section limit pinned with real UI code: 0x16FEE0 flashes, 0x170028 is refused (NAK at section b).
+  => limit 0x170000: UI code (at flash 0x168000) must stay <= 32 KB (0x8000). Earlier 0xFF-padding test was misleading.

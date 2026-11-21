@@ -103,7 +103,7 @@ void gfx_tri(float x0_, float y0_, float x1_, float y1_, float x2_, float y2_, r
     float ar = (x1_ - x0_) * (y2_ - y0_) - (x2_ - x0_) * (y1_ - y0_); float sg = ar > 0 ? 1.0f : -1.0f;
     for (int py = by0; py < by1; py++) for (int px = bx0; px < bx1; px++) {
         float m = 1e9f; for (int i = 0; i < 3; i++) { int j = (i + 1) % 3; float ex = xs[j] - xs[i], ey = ys[j] - ys[i], n = fsq(ex * ex + ey * ey);
-            float d = sg * ((px + 0.5f - xs[i]) * ey - (py + 0.5f - ys[i]) * ex) / n; if (d < m) m = d; }
+            float d = sg * (ex * (py + 0.5f - ys[i]) - ey * (px + 0.5f - xs[i])) / n; if (d < m) m = d; }
         put(px, py, c, cov(-m, a)); }
 }
 void gfx_bar(float x, float y, float w, float h, float v, rgb_t c)

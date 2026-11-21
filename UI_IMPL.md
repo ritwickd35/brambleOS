@@ -171,3 +171,21 @@ Everything below was worked out on the stock/CFW 1.0.2 MCU app (`cfw/mcu_cfw.dis
 Home 02, push-and-hold 05, effects edit 10, settings 04, drum 06, tuner 03, recorder 09, off-state charging 13. (Earlier guesses from code layout were wrong.) Theme byte read 1 on the test pedal.
 ui4 (float gfx + state at 0x2001BC00) hung on the home screen; ui5 (integer only, no globals) is stable.
 ui6 (float gfx, state on stack + r10, -ffixed-$r10) stable: the hang was the RAM address 0x2001BC00. No known-free MCU RAM; keep state on stack/r10.
+- Status values (measured on the pedal, gp = 0x2000FA40): battery level 0..5 = byte 0x200084A9 (getter 0x14800);
+  battery mV = u16 0x200084A6 (noisy, +-40 mV); power state byte 0x200084AC: 2 = USB in, 0/1 on battery;
+  unsaved-changes flag byte 0x2000D134 (getter 0x4ED14, stock '*'); CFW CPU % x10 = u16 0x2001BBB2 (valid if
+  byte 0x2001BBB4 != 0). Bluetooth / master volume / BPM: not found yet (home cb3 polls 0x5219c(0..2) =
+  bytes 0x200084B4 / 0x200179E8 / 0x200084B7, all 0 at rest - candidates).
+
+## Edit page attempt (2026-11-22) - rolled back
+- Window 10 is the CFW's own edit page (registered in CFW code 0x16Exxxx), not Sonicake's. Its state: selected block = byte
+  0x2001BC31 (module id, DRV=2 AMP=3); frame position = byte 0x2001BC32 (0 = block, 1.. = knob; changes when turning);
+  sub-mode byte 0x2001BC30; a counter at 0x2001BC28. The "open for editing" flag and the knob-page flag were NOT found.
+- Chain order = bytes M+0x63.. (10 entries, module ids), used by the home page. Model/knob names come from the effect DB
+  (walk verified on the Mac for all 10 groups); knob value = float at M+0x95+32*module+4*param.
+- Overlaying a page on the CFW edit page without owning its input is unreliable: the same press means on/off, open knob or
+  close knob depending on hidden state, and page 2 of knobs could not be reached. Probe values at 0x2000AB28 never changed
+  (possibly because the probe only redrew when the top section was flushed - not conclusive).
+- Decision needed: either keep the CFW edit page, or own the whole edit page (own key handler + own state + model/param
+  setters 0x4D804 / 0x5031C family + DSP notify 0x4CA58). Home page (window 2) stays ours.
+- Build limit: UI code <= 32 KB (0x170000 section end). ui29 (home page only) = 26.5 KB.
