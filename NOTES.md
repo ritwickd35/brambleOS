@@ -982,3 +982,7 @@ MCU app +50 KB (UI, MIDI, scenes …), effect DB rewritten (new names/knobs).
   keep the UI code under ~29 KB until measured with real data. (Pedal stays in update mode on a refusal; reflash.)
 - 2026-11-22: MCU section limit pinned with real UI code: 0x16FEE0 flashes, 0x170028 is refused (NAK at section b).
   => limit 0x170000: UI code (at flash 0x168000) must stay <= 32 KB (0x8000). Earlier 0xFF-padding test was misleading.
+- 2026-11-22 DI regression test done (8 guitar takes x 531 checks, on clone5 + UI builds): per take 1 clipping (AMP Jazz 120
+  at VOL=100, expected) and 16-17 "dead" = the 16 cab VOL=0 checks (expected) + random chain7 silent in 5 of 8 takes
+  (same random settings every take, quiet -53 dB in the other 3: probably a near-zero volume knob; not yet confirmed).
+  Take 3 had to be redone (audio device lost during UI flashing); logs/night_di3_audiolost kept.
