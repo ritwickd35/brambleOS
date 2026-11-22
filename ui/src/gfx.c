@@ -143,14 +143,14 @@ void gfx_tile(float x, float y, float w, float h, int lit, int sel, float r)
     gfx_rrect(x + 1, y + h * 0.62f, w - 2, h * 0.36f, r - 1, blk, T->dark ? 0.10f : 0.07f);
 }
 void gfx_led(float x, float y, int on) { if (!on) return; gfx_disc(x, y, 3.4f, T->on, 0.30f); gfx_disc(x, y, 1.9f, T->on, 1); gfx_disc(x - 0.5f, y - 0.6f, 0.8f, RGB(255, 255, 255), 0.6f); }
-int gfx_text_w(const font_t *f, const char *s) { int w = 0; for (; *s; s++) if (*s >= 32 && *s < 127) w += f->g[*s - 32].adv; return w; }
+int gfx_text_w(const font_t *f, const char *s) { int w = 0; for (; *s; s++) { int i = *s - f->first; if (i >= 0 && i < f->count) w += f->g[i].adv; } return w; }
 void gfx_text(float x, float y, const char *s, const font_t *f, rgb_t c, const char *anchor, float a)
 {
     int w = gfx_text_w(f, s); float x0 = x, y0 = y;
     if (anchor[0] == 'm') x0 = x - w * 0.5f; else if (anchor[0] == 'r') x0 = x - w;
     if (anchor[1] == 'm') y0 = y - f->height * 0.5f; else if (anchor[1] == 'b') y0 = y - f->height;
     int cx = (int)(x0 + 0.5f), cy = (int)(y0 + 0.5f);
-    for (; *s; s++) { if (*s < 32 || *s > 126) continue; const glyph_t *g = &f->g[*s - 32];
+    for (; *s; s++) { int gi = *s - f->first; if (gi < 0 || gi >= f->count) continue; const glyph_t *g = &f->g[gi];
         for (int j = 0; j < g->h; j++) { int py = cy + g->yo + j; if (py < Y1 || py > Y2) continue;
             for (int i = 0; i < g->w; i++) { int px = cx + g->xo + i; if (px < X1 || px > X2) continue; int k = j * g->w + i, q = (f->bits[g->off + (k >> 2)] >> (6 - 2 * (k & 3))) & 3;
                 if (q) put(px, py, c, (int)(q * 85 * a)); } }

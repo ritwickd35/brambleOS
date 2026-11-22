@@ -19,6 +19,10 @@ def main():
     o = 0x16BD54 - 0x10000; assert b[o:o + 6] == bytes.fromhex("44550be8dd25"), b[o:o + 6].hex()
     b += b"\xff" * (0x168000 - len(b)); b += code
     b[o:o + 4] = struct.pack(">I", 0x49000000 | (((sym["ui_hook"] - 0x16BD54) // 2) & 0xFFFFFF)); b[o + 4:o + 6] = bytes.fromhex("9200")
+    def jal(at, old, new):                                  # redirect one `jal old` (4 bytes) at CPU address `at` to our function `new`
+        q = at - 0x10000; want = struct.pack(">I", 0x49000000 | (((old - at) // 2) & 0xFFFFFF)); assert b[q:q + 4] == want, (hex(at), b[q:q + 4].hex())
+        b[q:q + 4] = struct.pack(">I", 0x49000000 | (((sym[new] - at) // 2) & 0xFFFFFF))
+    if "tuner_sig" in sym: jal(0x2B4A4, 0x29C0C, "tuner_sig"); jal(0x2B4BE, 0x2A0A0, "tuner_nosig")   # tuner update -> our page
     open(p, "wb").write(b)
     binf = os.path.join(out, f"PocketMaster_CFW1.0.2+{name}.bin")
     subprocess.run([sys.executable, os.path.join(RE, "pmfw.py"), "pack", os.path.join(out, "src"), binf], check=True, stdout=subprocess.DEVNULL)

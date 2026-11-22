@@ -79,57 +79,85 @@ typedef int (*kh_t)(void *, unsigned *);
 #define O_RIGHT ((kh_t)0x1C210u)
 #define O_LONG ((kh_t)0x1C0ECu)
 static void edit_state(model_t *m) { read_model(m); read_edit(m); }
-static void edit_paint(const model_t *m, int ya, int yb)
+static void paint(void (*pg)(const model_t *), const model_t *m, int ya, int yb)
 {
     long long cb[4]; void *old = gfx_bind(cb); u16 *buf = (u16 *)MALLOC(160 * 8 * 2); int y, ye;
-    if (buf) { for (y = ya; y <= yb; y += 8) { ye = y + 7 > yb ? yb : y + 7; gfx_begin(0, 159, y, ye, buf, &THEMES[0]); page_edit(m); FLUSH(0, 159, y, ye, buf); } FREE(buf); }
+    if (buf) { for (y = ya; y <= yb; y += 8) { ye = y + 7 > yb ? yb : y + 7; gfx_begin(0, 159, y, ye, buf, &THEMES[0]); pg(m); FLUSH(0, 159, y, ye, buf); } FREE(buf); }
     gfx_bind(old);
 }
+#define edit_paint(m, a, b) paint(page_edit, m, a, b)
+static void edit_paint_r(const model_t *m, int xa, int xb, int ya, int yb)
+{
+    long long cb[4]; void *old = gfx_bind(cb); int w = xb - xa + 1, y, ye; u16 *buf = (u16 *)MALLOC(w * 8 * 2);
+    if (buf) { for (y = ya; y <= yb; y += 8) { ye = y + 7 > yb ? yb : y + 7; gfx_begin(xa, xb, y, ye, buf, &THEMES[0]); page_edit(m); FLUSH(xa, xb, y, ye, buf); } FREE(buf); }
+    gfx_bind(old);
+}
+static void goto_cell(int c) { EW[0x2b] = 1 + c / 3; EW[0x2c] = c % 3; EW[0x28] = 1; }
+static int knob_mod(const model_t *m) { return (m->sel == 3 && m->nam) ? 9 : m->sel; }
+static int changed(int mod, int n, const float *b) { int i; for (i = 0; i < n; i++) { float d = PGET(mod, i) - b[i]; if (d > 1e-6f || d < -1e-6f) return i; } return -1; }
 static void goto_item(int kind, int ks)
 {
     if (kind == 0) { EW[0x2b] = 1 + ks / 3; EW[0x2c] = ks % 3; EW[0x28] = 1; }
     else { EW[0x2b] = 0; EW[0x2c] = kind == 1 ? 0 : kind == 2 ? 1 : 2; EW[0x28] = kind != 1; }
 }
-static int next_kind(const model_t *m, int *ks)       /* knobs -> model -> mode (AMP) -> knobs */
+#define EDF (*(volatile unsigned char *)0x2000D134u)         /* unsaved-changes flag */
+static int probe(void *c, int mod, int n)                     /* which knob does the original's current box change? -1 = none */
 {
-    if (m->ekind == 0 && m->ksel + 1 < m->nk) { *ks = m->ksel + 1; return 0; }
-    if (m->ekind == 0) return 2;
-    if (m->ekind == 2 && m->sel == 3) return 3;
-    *ks = 0; return m->nk ? 0 : 2;
+    float b[8]; unsigned up[2] = {3, 1}, dn[2] = {3, (unsigned)-1}; int i, j; unsigned char ed = EDF;
+    for (i = 0; i < n; i++) b[i] = PGET(mod, i);
+    O_TURN(c, up); j = changed(mod, n, b);
+    if (j >= 0) O_TURN(c, dn); else { O_TURN(c, dn); j = changed(mod, n, b); if (j >= 0) O_TURN(c, up); }
+    EDF = ed; return j;
 }
 static int k_push(void *c, unsigned *msg)
 {
-    model_t m; int kind, ks = 0; edit_state(&m); (void)c; (void)msg;
-    kind = next_kind(&m, &ks); goto_item(kind, ks); edit_state(&m); edit_paint(&m, 32, 127);
-    return 0;
-}
-static int k_double(void *c, unsigned *msg)            /* double-push = block on/off from anywhere (the first push moved on: undo it) */
-{
-    model_t m; int kind = 0, ks = 0; edit_state(&m);
-    if (m.ekind == 0 && m.ksel > 0) { kind = 0; ks = m.ksel - 1; } else if (m.ekind == 0) kind = m.sel == 3 ? 3 : 2;
-    else if (m.ekind == 3) kind = 2; else { kind = 0; ks = m.nk ? m.nk - 1 : 0; if (!m.nk) kind = 2; }
-    goto_item(1, 0); O_PUSH(c, msg);                                                                  /* original: push on the on/off box */
-    goto_item(kind, ks); edit_state(&m); edit_paint(&m, 0, 127);
-    return 0;
+    model_t m; int cell, j = -1, t; edit_state(&m); (void)msg;
+    if (m.ekind == 0) {                                                                           /* next box that changes a knob */
+        cell = EW[0x2b] >= 1 ? (EW[0x2b] - 1) * 3 + EW[0x2c] : 0;
+        for (t = 0; t < 3 && j < 0; t++) { cell++; if (cell >= m.nk + 2) break; goto_cell(cell); j = probe(c, knob_mod(&m), m.nk); }
+        if (j < 0) goto_item(2, 0);
+    } else if (m.ekind == 2 && m.sel == 3) goto_item(3, 0);
+    else { for (cell = 0; cell < 3 && j < 0; cell++) { goto_cell(cell); j = probe(c, knob_mod(&m), m.nk); } if (j < 0) goto_item(2, 0); }
+    edit_state(&m); if (j >= 0) { m.ekind = 0; m.ksel = j; }
+    edit_paint(&m, 32, 127); return 0;
 }
 static int k_turn(void *c, unsigned *msg)
 {
-    model_t m; edit_state(&m); goto_item(m.ekind, m.ksel < 0 ? 0 : m.ksel); O_TURN(c, msg); edit_state(&m);
-    if (m.ekind == 0) { edit_paint(&m, 0, 11); edit_paint(&m, 76, 127); } else edit_paint(&m, 0, 127);   /* knob: only its row + the '*' */
-    return 0;
+    model_t m; int i, mod, n, j, old; float b[8];
+    edit_state(&m); mod = knob_mod(&m); n = m.nk;
+    if (m.ekind == 0) {
+        EW[0x28] = 1; for (i = 0; i < n; i++) b[i] = PGET(mod, i);
+        O_TURN(c, msg); j = changed(mod, n, b);
+        old = j >= 0 ? m.kv[j] : -1; edit_state(&m); m.ekind = 0; if (j >= 0) m.ksel = j;
+        if (j >= 0 && old != m.kv[j]) {                                                             /* sweep: 2 small frames, knob column only */
+            int nv = m.kv[j], x0 = 22 + 39 * (j % 4) - 19; for (i = 1; i <= 2; i++) { m.kv[j] = old + (nv - old) * i / 3; edit_paint_r(&m, x0, x0 + 38, 79, 121); } m.kv[j] = nv; }
+        edit_paint(&m, 0, 11); edit_paint(&m, 76, 127); return 0;
+    }
+    { int mi = M[0x244 + mod]; goto_item(m.ekind, 0); O_TURN(c, msg);
+      if (M[0x244 + mod] == mi && m.ekind == 2) { EW[0x28] = 0; O_PUSH(c, msg); EW[0x28] = 1; O_TURN(c, msg); } }
+    edit_state(&m); edit_paint(&m, 0, 127); return 0;
 }
 static int k_left(void *c, unsigned *msg) { int r = O_LEFT(c, msg); model_t m; edit_state(&m); edit_paint(&m, 0, 127); return r; }
 static int k_right(void *c, unsigned *msg) { int r = O_RIGHT(c, msg); model_t m; edit_state(&m); edit_paint(&m, 0, 127); return r; }
 static int k_long(void *c, unsigned *msg) { int r = O_LONG(c, msg); model_t m; edit_state(&m); edit_paint(&m, 0, 127); return r; }
 static void edit_keys(void)
 {
-    int i, n = KN, dbl = 0; for (i = 0; i < n && i < 128; i++) { unsigned msg = KT[2 * i], h;
-        h = msg == 3 ? (unsigned)k_turn : msg == 0x30202 ? (unsigned)k_push : msg == 0x60202 ? (unsigned)k_double : (msg == 0x30002 || msg == 0x50002) ? (unsigned)k_left :
+    int i, n = KN; for (i = 0; i < n && i < 128; i++) { unsigned msg = KT[2 * i], h;
+        h = msg == 3 ? (unsigned)k_turn : msg == 0x30202 ? (unsigned)k_push : (msg == 0x30002 || msg == 0x50002) ? (unsigned)k_left :
             (msg == 0x30102 || msg == 0x50102) ? (unsigned)k_right : (msg == 0x40002 || msg == 0x40102 || msg == 0x40202 || msg == 0x48002) ? (unsigned)k_long : 0;
-        if (msg == 0x60202) dbl = 1;
         if (h && KT[2 * i + 1] != h) KT[2 * i + 1] = h; }
-    if (!dbl && n < 127) { KT[2 * n] = 0x60202; KT[2 * n + 1] = (unsigned)k_double; KN = n + 1; }    /* add double-push */
 }
+/* ---- Tuner (window 3) ----
+ * The original tuner update calls a draw function with the fresh result (note, octave, cents); build_ui.py points those
+ * two calls (signal / no signal) here. w1 bytes: [1] note, [3] octave; w0 = frequency (float bits); cents = rounded. */
+void tuner_sig(void *ctx, unsigned w0, unsigned w1, unsigned w2, unsigned w3, unsigned w4, int cents)
+{
+    model_t m; int note = (signed char)(w1 >> 8), oct = (signed char)(w1 >> 24); float hz = f32(w0); (void)ctx; (void)w2; (void)w3; (void)w4;
+    if (note >= 12) { oct = note / 12 - 1; note %= 12; }
+    m.note = note < 0 ? -1 : note; m.octave = oct; m.cents = (signed char)cents; m.hz10 = hz > 10 && hz < 5000 ? (int)(hz * 10 + 0.5f) : 0; m.a4 = 0; m.mute = 0;
+    paint(page_tuner, &m, 14, 127);
+}
+void tuner_nosig(void *ctx) { model_t m; (void)ctx; m.note = -1; m.a4 = 0; m.mute = 0; m.cents = 0; m.hz10 = 0; m.octave = 0; paint(page_tuner, &m, 14, 127); }
 __attribute__((section(".text.hook"))) void ui_hook(int x1, int x2, int y1, int y2, u16 *px)
 {
     long long ctxbuf[4]; void *old = gfx_bind(ctxbuf);
@@ -151,6 +179,9 @@ __attribute__((section(".text.hook"))) void ui_hook(int x1, int x2, int y1, int 
             FREE(buf); gfx_bind(old); return;
         }
         gfx_begin(x1, x2, y1, y2, px, &THEMES[0]); page_home(&m);
+    } else if (WIN == 3) {
+        gfx_bind(old); if (y1 <= 13) tuner_nosig(0);                                                  /* page entry: header + empty gauge */
+        return;
     } else if (WIN == 10) {
         /* Our handlers repaint after every action; the original's own later updates are dropped, except a top-of-screen update
          * (page entry, preset change), which repaints the whole page once. */

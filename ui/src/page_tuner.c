@@ -8,12 +8,12 @@ void page_tuner(const model_t *m)
     rgb_t acc = intune ? t->on : t->ring;
     gfx_bg();
     p = b; *p++ = 'A'; *p++ = '4'; *p++ = ' '; *p++ = '='; *p++ = ' '; p = itoa3(m->a4, p); *p++ = ' '; *p++ = 'H'; *p++ = 'z'; *p = 0;
-    gfx_text(80, 8, b, &FONT9, t->sub, "mm", 1);
+    if (m->a4 > 0) gfx_text(80, 8, b, &FONT9, t->sub, "mm", 1); else gfx_text(80, 8, "Tuner", &FONT9, t->sub, "mm", 1);
     if (m->mute) gfx_pill(118, 2, 38, 12, "MUTE", &FONT7, 1, t->warn);
     /* note, octave, frequency, cents (top); gauge arc of tick dots below, pivot off-screen, needle = bright dot + stem */
     if (sig) { gfx_text(80, 34, NOTE[m->note], &FONT24, intune ? t->on : t->text, "mm", 1);
         itoa3(m->octave, b); gfx_text(80 + gfx_text_w(&FONT24, NOTE[m->note]) * 0.5f + 3, 27, b, &FONT9, t->sub, "lm", 1);
-        p = itoa3(m->hz10 / 10, b); *p++ = '.'; *p++ = '0' + m->hz10 % 10; *p++ = ' '; *p++ = 'H'; *p++ = 'z'; *p = 0; gfx_text(80, 54, b, &FONT7, t->sub, "mm", 1); }
+        if (m->hz10) { p = itoa3(m->hz10 / 10, b); *p++ = '.'; *p++ = '0' + m->hz10 % 10; *p++ = ' '; *p++ = 'H'; *p++ = 'z'; *p = 0; gfx_text(80, 54, b, &FONT7, t->sub, "mm", 1); } }
     else gfx_text(80, 36, "play a string", &FONT9, t->sub, "mm", 1);
     for (int i = -5; i <= 5; i++) { float a = -90 + i * 10; gfx_disc(80 + 62 * gfx_sin(a + 90), 136 + 62 * gfx_sin(a), i ? 1.9f : 2.8f, i ? t->sub : acc, i ? 0.6f : 0.95f); }
     if (sig) { float a = -90 + c * 1.0f; for (int r = 34; r <= 56; r += 2) gfx_disc(80 + r * gfx_sin(a + 90), 136 + r * gfx_sin(a), 1.1f, acc, 0.25f + 0.012f * r);
