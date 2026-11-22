@@ -62,8 +62,11 @@ static void read_edit(model_t *m)
         cpy(m->kn[k], sb + noff, sizeof m->kn[k]); m->kv[k] = pct < 0 ? 0 : pct > 100 ? 100 : pct;
     }
     m->nk = k;
-    if (m->erow == 0) { m->ekind = m->ecol == 2 && m->sel == 3 ? 3 : 2; m->ksel = -1; }               /* on/off is not a cursor stop any more */
-    else { m->ekind = 0; m->ksel = (m->erow - 1) * 3 + m->ecol; if (m->ksel >= m->nk) m->ksel = 0; }
+    /* The original numbers its boxes in one run, 3 per row: on/off, model, [mode: AMP only], then the knobs. */
+    { int cell = m->erow * 3 + m->ecol, base = m->sel == 3 ? 3 : 2;
+      if (cell == 0) { m->ekind = 1; m->ksel = -1; } else if (cell == 1) { m->ekind = 2; m->ksel = -1; }
+      else if (cell == 2 && base == 3) { m->ekind = 3; m->ksel = -1; }
+      else { m->ekind = 0; m->ksel = cell - base; if (m->ksel >= m->nk) m->ksel = 0; } }
 }
 /* ---- Edit page controls (Berry design) ----
  * The edit page's key table (RAM, rebuilt by the original on window entry) gets our handlers. They drive the original page's
@@ -92,50 +95,39 @@ static void edit_paint_r(const model_t *m, int xa, int xb, int ya, int yb)
     if (buf) { for (y = ya; y <= yb; y += 8) { ye = y + 7 > yb ? yb : y + 7; gfx_begin(xa, xb, y, ye, buf, &THEMES[0]); page_edit(m); FLUSH(xa, xb, y, ye, buf); } FREE(buf); }
     gfx_bind(old);
 }
-static void goto_cell(int c) { EW[0x2b] = 1 + c / 3; EW[0x2c] = c % 3; EW[0x28] = 1; }
-static int knob_mod(const model_t *m) { return (m->sel == 3 && m->nam) ? 9 : m->sel; }
-static int changed(int mod, int n, const float *b) { int i; for (i = 0; i < n; i++) { float d = PGET(mod, i) - b[i]; if (d > 1e-6f || d < -1e-6f) return i; } return -1; }
-static void goto_item(int kind, int ks)
+static void goto_item(const model_t *m, int kind, int ks)    /* put the original's cursor on an item; open it unless on/off */
 {
-    if (kind == 0) { EW[0x2b] = 1 + ks / 3; EW[0x2c] = ks % 3; EW[0x28] = 1; }
-    else { EW[0x2b] = 0; EW[0x2c] = kind == 1 ? 0 : kind == 2 ? 1 : 2; EW[0x28] = kind != 1; }
+    int base = m->sel == 3 ? 3 : 2, cell = kind == 0 ? base + ks : kind == 1 ? 0 : kind == 2 ? 1 : 2;
+    EW[0x2b] = cell / 3; EW[0x2c] = cell % 3; EW[0x28] = kind != 1;
 }
-#define EDF (*(volatile unsigned char *)0x2000D134u)         /* unsaved-changes flag */
-static int probe(void *c, int mod, int n)                     /* which knob does the original's current box change? -1 = none */
+static int k_push(void *c, unsigned *msg)                    /* next item: knobs -> model -> mode (AMP) -> knobs */
 {
-    float b[8]; unsigned up[2] = {3, 1}, dn[2] = {3, (unsigned)-1}; int i, j; unsigned char ed = EDF;
-    for (i = 0; i < n; i++) b[i] = PGET(mod, i);
-    O_TURN(c, up); j = changed(mod, n, b);
-    if (j >= 0) O_TURN(c, dn); else { O_TURN(c, dn); j = changed(mod, n, b); if (j >= 0) O_TURN(c, up); }
-    EDF = ed; return j;
-}
-static int k_push(void *c, unsigned *msg)
-{
-    model_t m; int cell, j = -1, t; edit_state(&m); (void)msg;
-    if (m.ekind == 0) {                                                                           /* next box that changes a knob */
-        cell = EW[0x2b] >= 1 ? (EW[0x2b] - 1) * 3 + EW[0x2c] : 0;
-        for (t = 0; t < 3 && j < 0; t++) { cell++; if (cell >= m.nk + 2) break; goto_cell(cell); j = probe(c, knob_mod(&m), m.nk); }
-        if (j < 0) goto_item(2, 0);
-    } else if (m.ekind == 2 && m.sel == 3) goto_item(3, 0);
-    else { for (cell = 0; cell < 3 && j < 0; cell++) { goto_cell(cell); j = probe(c, knob_mod(&m), m.nk); } if (j < 0) goto_item(2, 0); }
-    edit_state(&m); if (j >= 0) { m.ekind = 0; m.ksel = j; }
-    edit_paint(&m, 32, 127); return 0;
+    model_t m; int kind, ks = 0; edit_state(&m); (void)c; (void)msg;
+    if (m.ekind == 0 && m.ksel + 1 < m.nk) { kind = 0; ks = m.ksel + 1; }
+    else if (m.ekind == 0 || m.ekind == 1) kind = 2;
+    else if (m.ekind == 2 && m.sel == 3) kind = 3;
+    else { kind = m.nk ? 0 : 2; }
+    goto_item(&m, kind, ks); edit_state(&m); edit_paint(&m, 32, 127); return 0;
 }
 static int k_turn(void *c, unsigned *msg)
 {
-    model_t m; int i, mod, n, j, old; float b[8];
-    edit_state(&m); mod = knob_mod(&m); n = m.nk;
+    model_t m; int i, ks, old = -1; edit_state(&m);
+    if (m.ekind == 1) { goto_item(&m, m.nk ? 0 : 2, 0); edit_state(&m); }                           /* never edit on/off by turning */
+    goto_item(&m, m.ekind, m.ksel < 0 ? 0 : m.ksel); ks = m.ksel; if (m.ekind == 0) old = m.kv[ks];
+    O_TURN(c, msg); edit_state(&m);
     if (m.ekind == 0) {
-        EW[0x28] = 1; for (i = 0; i < n; i++) b[i] = PGET(mod, i);
-        O_TURN(c, msg); j = changed(mod, n, b);
-        old = j >= 0 ? m.kv[j] : -1; edit_state(&m); m.ekind = 0; if (j >= 0) m.ksel = j;
-        if (j >= 0 && old != m.kv[j]) {                                                             /* sweep: 2 small frames, knob column only */
-            int nv = m.kv[j], x0 = 22 + 39 * (j % 4) - 19; for (i = 1; i <= 2; i++) { m.kv[j] = old + (nv - old) * i / 3; edit_paint_r(&m, x0, x0 + 38, 79, 121); } m.kv[j] = nv; }
+        if (old >= 0 && old != m.kv[ks]) {                                                            /* sweep: 2 frames, knob column only */
+            int nv = m.kv[ks], x0 = 22 + 39 * (ks % 4) - 19; for (i = 1; i <= 2; i++) { m.kv[ks] = old + (nv - old) * i / 3; edit_paint_r(&m, x0, x0 + 38, 79, 121); } m.kv[ks] = nv; }
         edit_paint(&m, 0, 11); edit_paint(&m, 76, 127); return 0;
     }
-    { int mi = M[0x244 + mod]; goto_item(m.ekind, 0); O_TURN(c, msg);
-      if (M[0x244 + mod] == mi && m.ekind == 2) { EW[0x28] = 0; O_PUSH(c, msg); EW[0x28] = 1; O_TURN(c, msg); } }
-    edit_state(&m); edit_paint(&m, 0, 127); return 0;
+    edit_paint(&m, 0, 127); return 0;
+}
+static int k_hold(void *c, unsigned *msg)                    /* hold the knob = block on/off; the highlight stays */
+{
+    model_t m; int kind, ks; edit_state(&m); kind = m.ekind == 1 ? 0 : m.ekind; ks = m.ksel < 0 ? 0 : m.ksel;
+    { int was = m.on[m.sel]; goto_item(&m, 1, 0); O_PUSH(c, msg); edit_state(&m);
+      if (m.on[m.sel] == was) { unsigned t[2]; t[0] = 3; t[1] = was ? (unsigned)-1 : 1u; EW[0x28] = 1; O_TURN(c, t); EW[0x28] = 0; edit_state(&m); } }   /* NAM amp: the box opens instead */
+    goto_item(&m, kind, ks); edit_state(&m); edit_paint(&m, 0, 127); return 0;
 }
 static int k_left(void *c, unsigned *msg) { int r = O_LEFT(c, msg); model_t m; edit_state(&m); edit_paint(&m, 0, 127); return r; }
 static int k_right(void *c, unsigned *msg) { int r = O_RIGHT(c, msg); model_t m; edit_state(&m); edit_paint(&m, 0, 127); return r; }
@@ -144,7 +136,7 @@ static void edit_keys(void)
 {
     int i, n = KN; for (i = 0; i < n && i < 128; i++) { unsigned msg = KT[2 * i], h;
         h = msg == 3 ? (unsigned)k_turn : msg == 0x30202 ? (unsigned)k_push : (msg == 0x30002 || msg == 0x50002) ? (unsigned)k_left :
-            (msg == 0x30102 || msg == 0x50102) ? (unsigned)k_right : (msg == 0x40002 || msg == 0x40102 || msg == 0x40202 || msg == 0x48002) ? (unsigned)k_long : 0;
+            (msg == 0x30102 || msg == 0x50102) ? (unsigned)k_right : msg == 0x40202 ? (unsigned)k_hold : (msg == 0x40002 || msg == 0x40102 || msg == 0x48002) ? (unsigned)k_long : 0;
         if (h && KT[2 * i + 1] != h) KT[2 * i + 1] = h; }
 }
 /* ---- Tuner (window 3) ----
