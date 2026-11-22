@@ -41,6 +41,15 @@ static const unsigned char *db_rec(int g, int idx)
 static unsigned rd32(const volatile unsigned char *p) { return p[0] | (p[1] << 8) | (p[2] << 16) | ((unsigned)p[3] << 24); }
 static float f32(unsigned u) { union { unsigned u; float f; } x; x.u = u; return x.f; }
 static void cpy(char *d, const unsigned char *s, int n) { int i; for (i = 0; i < n - 1 && s[i] >= 32 && s[i] < 127; i++) d[i] = s[i]; d[i] = 0; }
+#define EW ((volatile unsigned char *)0x2000AB48u)            /* edit page data block (gp-20216) */
+#define BOXES ((int (*)(void *))0x337D8u)                      /* number of child widgets (the original page's boxes) */
+static int nboxes(void) { void *p = (void *)rd32(EW + 0xc); return p ? BOXES(p) : 0; }
+static int edit_base(int sel, int nk)                  /* boxes before the first knob: page box count - knobs (2 or 3) */
+{
+    int nb = nboxes(), b = nb - nk;
+    if (nb > 0 && (b == 2 || b == 3)) return b;
+    return (sel == 1 || sel == 3 || sel == 6) ? 3 : 2;                                          /* FX1, AMP, FX2 have a 3rd box */
+}
 typedef float (*pget_t)(int, int);
 #define PGET ((pget_t)0x5031Cu)                               /* knob value getter (module, knob) */
 static void read_edit(model_t *m)
@@ -63,9 +72,9 @@ static void read_edit(model_t *m)
     }
     m->nk = k;
     /* The original numbers its boxes in one run, 3 per row: on/off, model, [mode: AMP only], then the knobs. */
-    { int cell = m->erow * 3 + m->ecol, base = m->sel == 3 ? 3 : 2;
+    { int cell = m->erow * 3 + m->ecol, base = edit_base(m->sel, m->nk);
       if (cell == 0) { m->ekind = 1; m->ksel = -1; } else if (cell == 1) { m->ekind = 2; m->ksel = -1; }
-      else if (cell == 2 && base == 3) { m->ekind = 3; m->ksel = -1; }
+      else if (cell == 2 && base == 3) { m->ekind = 3; m->ksel = -1; }                            /* 3rd box: mode / extra */
       else { m->ekind = 0; m->ksel = cell - base; if (m->ksel >= m->nk) m->ksel = 0; } }
 }
 /* ---- Edit page controls (Berry design) ----
@@ -75,7 +84,6 @@ static void read_edit(model_t *m)
 typedef int (*kh_t)(void *, unsigned *);
 #define KT ((volatile unsigned *)0x2000B554u)                 /* key table {msg, handler} (gp-17644) */
 #define KN (*(volatile unsigned char *)0x200045A2u)           /* entries (gp-46238) */
-#define EW ((volatile unsigned char *)0x2000AB48u)            /* edit page data block (gp-20216) */
 #define O_TURN ((kh_t)0x16E96Eu)                              /* original: encoder turn (custom firmware) */
 #define O_PUSH ((kh_t)0x1D034u)
 #define O_LEFT ((kh_t)0x1C3B0u)
@@ -97,7 +105,8 @@ static void edit_paint_r(const model_t *m, int xa, int xb, int ya, int yb)
 }
 static void goto_item(const model_t *m, int kind, int ks)    /* put the original's cursor on an item; open it unless on/off */
 {
-    int base = m->sel == 3 ? 3 : 2, cell = kind == 0 ? base + ks : kind == 1 ? 0 : kind == 2 ? 1 : 2;
+    int base = edit_base(m->sel, m->nk), cell = kind == 0 ? base + ks : kind == 1 ? 0 : kind == 2 ? 1 : 2, nb = nboxes();
+    if (nb > 0 && cell >= nb) cell = nb - 1;                                                        /* never past the last box */
     EW[0x2b] = cell / 3; EW[0x2c] = cell % 3; EW[0x28] = kind != 1;
 }
 static int k_push(void *c, unsigned *msg)                    /* next item: knobs -> model -> mode (AMP) -> knobs */
@@ -105,7 +114,7 @@ static int k_push(void *c, unsigned *msg)                    /* next item: knobs
     model_t m; int kind, ks = 0; edit_state(&m); (void)c; (void)msg;
     if (m.ekind == 0 && m.ksel + 1 < m.nk) { kind = 0; ks = m.ksel + 1; }
     else if (m.ekind == 0 || m.ekind == 1) kind = 2;
-    else if (m.ekind == 2 && m.sel == 3) kind = 3;
+    else if (m.ekind == 2 && m.sel == 3) kind = 3;                                                  /* AMP mode; other 3rd boxes are skipped */
     else { kind = m.nk ? 0 : 2; }
     goto_item(&m, kind, ks); edit_state(&m); edit_paint(&m, 32, 127); return 0;
 }
@@ -125,8 +134,7 @@ static int k_turn(void *c, unsigned *msg)
 static int k_hold(void *c, unsigned *msg)                    /* hold the knob = block on/off; the highlight stays */
 {
     model_t m; int kind, ks; edit_state(&m); kind = m.ekind == 1 ? 0 : m.ekind; ks = m.ksel < 0 ? 0 : m.ksel;
-    { int was = m.on[m.sel]; goto_item(&m, 1, 0); O_PUSH(c, msg); edit_state(&m);
-      if (m.on[m.sel] == was) { unsigned t[2]; t[0] = 3; t[1] = was ? (unsigned)-1 : 1u; EW[0x28] = 1; O_TURN(c, t); EW[0x28] = 0; edit_state(&m); } }   /* NAM amp: the box opens instead */
+    goto_item(&m, 1, 0); O_PUSH(c, msg); edit_state(&m);
     goto_item(&m, kind, ks); edit_state(&m); edit_paint(&m, 0, 127); return 0;
 }
 static int k_left(void *c, unsigned *msg) { int r = O_LEFT(c, msg); model_t m; edit_state(&m); edit_paint(&m, 0, 127); return r; }
