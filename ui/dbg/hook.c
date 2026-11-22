@@ -44,9 +44,9 @@ static void cpy(char *d, const unsigned char *s, int n) { int i; for (i = 0; i <
 #define EW ((volatile unsigned char *)0x2000AB48u)            /* edit page data block (gp-20216) */
 #define BOXES ((int (*)(void *))0x337D8u)                      /* number of child widgets (the original page's boxes) */
 static int nboxes(void) { void *p = (void *)rd32(EW + 0xc); return p ? BOXES(p) : 0; }
-static int edit_base(int sel, int nk)                  /* boxes before the first knob: the original's own rule (0x1CFA0 + AMP mode box) */
+static int edit_base(int sel, int nk)                  /* boxes before the first knob, measured on the pedal: DRV, IR, EQ have 2; the others 3 */
 {
-    (void)nk; return (sel == 3 || sel >= 6) ? 3 : 2;      /* AMP, FX2, DLY, RVB have a third box; NR, FX1, DRV, IR, EQ do not */
+    (void)nk; return (sel == 2 || sel == 4 || sel == 5) ? 2 : 3;
 }
 typedef float (*pget_t)(int, int);
 #define PGET ((pget_t)0x5031Cu)                               /* knob value getter (module, knob) */
