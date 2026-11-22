@@ -189,3 +189,13 @@ ui6 (float gfx, state on stack + r10, -ffixed-$r10) stable: the hang was the RAM
 - Decision needed: either keep the CFW edit page, or own the whole edit page (own key handler + own state + model/param
   setters 0x4D804 / 0x5031C family + DSP notify 0x4CA58). Home page (window 2) stays ours.
 - Build limit: UI code <= 32 KB (0x170000 section end). ui29 (home page only) = 26.5 KB.
+
+## Edit page owned (2026-11-22, build ui38)
+- Original edit page layout: row 0 = on/off, model, mode; rows 1.. = 3 knobs each. Page data block 0x2000AB48 (gp-20216):
+  +0x25 chain slot being edited, +0x28 open flag, +0x2B row, +0x2C column. Knob value getter 0x5031C(module, knob) -> float
+  (hard-float, fs0) - the direct M+0x95/0x99 formula is wrong for some effects.
+- Key table in RAM 0x2000B554 {msg, handler}, count byte 0x200045A2 (rebuilt on window entry); handler(ctx, msg), return 0 =
+  consumed. msg 3 = encoder turn (delta at msg[1]); 0x30202 push, 0x60202 double-push (added by us), 0x3/0x50002 and
+  0x3/0x50102 = ◁/▷ click/repeat, 0x4xx02 long, 0x38002 leave. Our handlers set the original's cursor/open flag and call the
+  original handlers (turn 0x16E96E, push 0x1D034, ◁ 0x1C3B0, ▷ 0x1C210, long 0x1C0EC), then repaint.
+- Partial updates from the original are dropped on window 10; only a top-of-screen update repaints the page.

@@ -34,8 +34,10 @@ for sz in SIZES:
         for i in range(0, len(flat), 4): bits.append((flat[i] << 6) | (flat[i + 1] << 4) | (flat[i + 2] << 2) | flat[i + 3])
         gl.append((w, h, x0 - sz // 2, y0, adv, off))
     ext.append(f"extern const font_t FONT{sz};")
+    if sz == 24: o.append("#ifndef PEDAL")      # the 24 px font is only used by the tuner mock-up (host), not on the pedal yet
     o.append(f"static const glyph_t G{sz}[95] = {{" + ",".join("{%d,%d,%d,%d,%d,%d}" % g for g in gl) + "};")
     o.append(f"static const unsigned char B{sz}[{len(bits)}] = {{" + ",".join(str(b) for b in bits) + "};")
     o.append(f"const font_t FONT{sz} = {{{asc + desc}, {asc}, G{sz}, B{sz}}};"); total += len(bits) + 95 * 7
+    if sz == 24: o.append("#endif")
 # one copy of the data: the header declares the fonts; the definitions are compiled only where FONT_DATA_IMPL is set (gfx.c)
 open(OUT, "w").write("\n".join(o[:3] + ext + ["#ifdef FONT_DATA_IMPL"] + o[3:] + ["#endif"]) + "\n"); print("font_data.h:", total, "bytes of data")

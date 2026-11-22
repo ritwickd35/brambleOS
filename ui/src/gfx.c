@@ -43,7 +43,9 @@ rgb_t rgbf(rgb_t a, rgb_t b, float t) { return RGB((u8)(a.r + (b.r - a.r) * t), 
 static inline void put(int x, int y, rgb_t c, int a)                    /* a: 0..256 */
 {
     if (a <= 0) return;
-    u16 *p = &PX[(y - Y1) * (X2 - X1 + 1) + (x - X1)]; u16 v = *p; v = (u16)((v >> 8) | (v << 8));
+    u16 *p = &PX[(y - Y1) * (X2 - X1 + 1) + (x - X1)], v;
+    if (a >= 256) { v = (u16)(((c.r >> 3) << 11) | ((c.g >> 2) << 5) | (c.b >> 3)); *p = (u16)((v >> 8) | (v << 8)); return; }   /* opaque: no read */
+    v = *p; v = (u16)((v >> 8) | (v << 8));
     int r = (v >> 11) << 3, g = ((v >> 5) & 63) << 2, b = (v & 31) << 3; r |= r >> 5; g |= g >> 6; b |= b >> 5;
     if (a >= 256) { r = c.r; g = c.g; b = c.b; } else { r += ((c.r - r) * a) >> 8; g += ((c.g - g) * a) >> 8; b += ((c.b - b) * a) >> 8; }
     v = (u16)(((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3)); *p = (u16)((v >> 8) | (v << 8));
@@ -62,13 +64,17 @@ static float sdf_rr(float px, float py, float x, float y, float w, float h, floa
 
 void gfx_bg(void)
 {
-    /* Vertical gradient, posterised into visible bands with a 4x4 ordered dither between them (the retro look). */
+    /* Vertical gradient, posterised into visible bands with a 4x4 ordered dither between them (the retro look).
+     * Integer per pixel: each row has a band level q and a fraction f (0..15) per channel; a pixel takes q+1 if f > bayer. */
     static const unsigned char bay[16] = {0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5};
-    for (int y = Y1; y <= Y2; y++) { float t = (float)y / 127.0f;
-        float r0 = T->bg0.r + (T->bg1.r - T->bg0.r) * t, g0 = T->bg0.g + (T->bg1.g - T->bg0.g) * t, b0 = T->bg0.b + (T->bg1.b - T->bg0.b) * t;
-        for (int x = X1; x <= X2; x++) { float th = (bay[(y & 3) * 4 + (x & 3)] + 0.5f) / 16.0f; float v[3] = {r0 / 12, g0 / 12, b0 / 12}; int o[3];
-            for (int k = 0; k < 3; k++) { int q = (int)v[k]; q += (v[k] - q) > th; q *= 12; o[k] = q > 255 ? 255 : q; }
-            put(x, y, RGB((u8)o[0], (u8)o[1], (u8)o[2]), 256); } }
+    for (int y = Y1; y <= Y2; y++) {
+        int q[3], f[3], c0[3] = {T->bg0.r, T->bg0.g, T->bg0.b}, c1[3] = {T->bg1.r, T->bg1.g, T->bg1.b};
+        for (int k = 0; k < 3; k++) { int v16 = (c0[k] * 16 * 127 + (c1[k] - c0[k]) * 16 * y) / 127 * 16 / 12 / 16;   /* value / 12 in 1/16 */
+            int v = (c0[k] * 127 + (c1[k] - c0[k]) * y) * 16 / (127 * 12); q[k] = v >> 4; f[k] = v & 15; (void)v16; }
+        u16 *row = &PX[(y - Y1) * (X2 - X1 + 1)]; const unsigned char *by = &bay[(y & 3) * 4];
+        for (int x = X1; x <= X2; x++) { int th = by[x & 3], o[3];
+            for (int k = 0; k < 3; k++) { int v = (q[k] + (f[k] > th)) * 12; o[k] = v > 255 ? 255 : v; }
+            u16 v = (u16)(((o[0] >> 3) << 11) | ((o[1] >> 2) << 5) | (o[2] >> 3)); row[x - X1] = (u16)((v >> 8) | (v << 8)); } }
 }
 static float smin(float a, float b, float k) { float h = 0.5f + 0.5f * (b - a) / k; h = h < 0 ? 0 : h > 1 ? 1 : h; return b + (a - b) * h - k * h * (1 - h); }
 void gfx_tray(float x, float y, float w, float h, float x2, float y2, float w2, float h2, float r, rgb_t c, float a)
@@ -79,8 +85,18 @@ void gfx_tray(float x, float y, float w, float h, float x2, float y2, float w2, 
 }
 void gfx_rrect(float x, float y, float w, float h, float r, rgb_t c, float a)
 {
-    int x0, x1, y0, y1; box(x, y, w, h, &x0, &x1, &y0, &y1);
-    for (int py = y0; py < y1; py++) for (int px = x0; px < x1; px++) put(px, py, c, cov(sdf_rr(px + 0.5f, py + 0.5f, x, y, w, h, r), a));
+    /* Only pixels near the outline need the distance maths; the inside (shrunk by the corner radius + 1 px) is solid. */
+    int x0, x1, y0, y1; box(x, y, w, h, &x0, &x1, &y0, &y1); int A = (int)(a * 256.0f);
+    int ix0 = (int)(x + r + 1), ix1 = (int)(x + w - r - 1), iy0 = (int)(y + 1), iy1 = (int)(y + h - 1);   /* inner band, full rows */
+    int jx0 = (int)(x + 1), jx1 = (int)(x + w - 1), jy0 = (int)(y + r + 1), jy1 = (int)(y + h - r - 1);   /* inner band, full cols */
+    for (int py = y0; py < y1; py++) for (int px = x0; px < x1; px++) {
+        if ((px >= ix0 && px < ix1 && py >= iy0 && py < iy1) || (px >= jx0 && px < jx1 && py >= jy0 && py < jy1)) { put(px, py, c, A); continue; }
+        put(px, py, c, cov(sdf_rr(px + 0.5f, py + 0.5f, x, y, w, h, r), a)); }
+}
+void gfx_rring(float x, float y, float w, float h, float r, float th, rgb_t c, float a)     /* rounded outline */
+{
+    int x0, x1, y0, y1; box(x - th, y - th, w + 2 * th, h + 2 * th, &x0, &x1, &y0, &y1);
+    for (int py = y0; py < y1; py++) for (int px = x0; px < x1; px++) { float d = sdf_rr(px + 0.5f, py + 0.5f, x, y, w, h, r); put(px, py, c, cov(fabsf_(d) - th * 0.5f, a)); }
 }
 void gfx_disc(float cx, float cy, float r, rgb_t c, float a)
 {

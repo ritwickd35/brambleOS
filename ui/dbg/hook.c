@@ -28,13 +28,6 @@ static void read_model(model_t *m)
     if (*(volatile unsigned char *)0x2001BBB4u) { int v = (*(volatile unsigned short *)0x2001BBB2u + 5) / 10; m->cpu = v > 199 ? 199 : v; }   /* CFW CPU meter, 0.1 % units */
 }
 
-/* DEBUG: bytes +0x20..+0x2F of the window data block the window manager passes to every window callback (gp-20216) */
-static void dbg_win(void)
-{
-    const volatile unsigned char *w = (const volatile unsigned char *)0x2000AB28u; char s[64]; int n = 0, i;
-    for (i = 0x20; i < 0x30; i++) { unsigned v = w[i]; if (v >= 100) s[n++] = '0' + v / 100; if (v >= 10) s[n++] = '0' + (v / 10) % 10; s[n++] = '0' + v % 10; s[n++] = i == 0x27 ? '|' : ' '; }
-    s[n] = 0; gfx_rrect(0, 0, 160, 9, 0, (rgb_t){0, 0, 0}, 0.9f); gfx_text(80, 4.5f, s, &FONT7, (rgb_t){255, 255, 255}, "mm", 1);
-}
 /* Effect DB (in flash, found through RAM tables; same walk as the stock 0x18440): record of model <idx> in group <g> */
 static const unsigned char *db_rec(int g, int idx)
 {
@@ -48,21 +41,94 @@ static const unsigned char *db_rec(int g, int idx)
 static unsigned rd32(const volatile unsigned char *p) { return p[0] | (p[1] << 8) | (p[2] << 16) | ((unsigned)p[3] << 24); }
 static float f32(unsigned u) { union { unsigned u; float f; } x; x.u = u; return x.f; }
 static void cpy(char *d, const unsigned char *s, int n) { int i; for (i = 0; i < n - 1 && s[i] >= 32 && s[i] < 127; i++) d[i] = s[i]; d[i] = 0; }
+typedef float (*pget_t)(int, int);
+#define PGET ((pget_t)0x5031Cu)                               /* knob value getter (module, knob) */
 static void read_edit(model_t *m)
 {
-    int sel = *(volatile unsigned char *)0x2001BC31u, k;                                             /* CFW edit page: block */
-    m->sel = sel < 9 ? sel : 0; { int b = *(volatile unsigned char *)0x2001BC32u; m->ksel = b - 1; }   /* CFW frame: 0 = block, 1.. = knob */ m->brand[0] = 0; m->nk = 0; m->mname[0] = 0;
-    const unsigned char *r = db_rec(m->sel, M[0x244 + m->sel]);
+    const volatile unsigned char *w = (const volatile unsigned char *)0x2000AB48u;                    /* edit page data block */
+    int slot = w[0x25], sel = slot < 10 ? M[0x63 + slot] : 0, k, g, mod;                              /* chain slot (updated at once by ◁/▷) -> block */
+    if (sel == 9) sel = 3;                                                                            /* clone sits in the AMP place */
+    m->sel = sel < 9 ? sel : 0; m->erow = w[0x2b]; m->ecol = w[0x2c]; m->eopen = w[0x28] != 0; m->ksel = -1;
+    m->brand[0] = 0; m->nk = 0; m->mname[0] = 0;
+    mod = (m->sel == 3 && m->nam) ? 9 : m->sel; g = mod;                                              /* AMP in clone mode = clone knobs */
+    const unsigned char *r = db_rec(g, M[0x244 + mod]);
     if (!r || r[8] == 0 || r[8] > 12) return;
     const unsigned char *sb = r + 16 + 24 * r[8];
-    cpy(m->mname, sb, sizeof m->mname);
+    cpy(m->mname, sb, sizeof m->mname); if (mod == 9) { const char *t = "NAM capture"; for (k = 0; t[k]; k++) m->brand[k] = t[k]; m->brand[k] = 0; }
     for (k = 0; k < r[8] && k < 8; k++) {
         const unsigned char *kr = r + 16 + 24 * k; unsigned noff = kr[2] | (kr[3] << 8);
-        float mn = f32(rd32(kr + 4)), mx = f32(rd32(kr + 8)), v = f32(rd32(M + 0x95 + 32 * m->sel + 4 * kr[20]));
+        float mn = f32(rd32(kr + 4)), mx = f32(rd32(kr + 8)), v = PGET(mod, k);                       /* the pedal's own knob -> value mapping */
         int pct = mx > mn ? (int)((v - mn) * 100.0f / (mx - mn) + 0.5f) : 0;
         cpy(m->kn[k], sb + noff, sizeof m->kn[k]); m->kv[k] = pct < 0 ? 0 : pct > 100 ? 100 : pct;
     }
     m->nk = k;
+    if (m->erow == 0) { m->ekind = m->ecol == 2 && m->sel == 3 ? 3 : 2; m->ksel = -1; }               /* on/off is not a cursor stop any more */
+    else { m->ekind = 0; m->ksel = (m->erow - 1) * 3 + m->ecol; if (m->ksel >= m->nk) m->ksel = 0; }
+}
+/* ---- Edit page controls (Berry design) ----
+ * The edit page's key table (RAM, rebuilt by the original on window entry) gets our handlers. They drive the original page's
+ * own cursor (row 0x2B, column 0x2C) and open flag (0x28) and pass the event to the original logic, so every custom-firmware
+ * feature keeps working: turn = change the highlighted item, push = next item, on/off = turn right/left on the ON item. */
+typedef int (*kh_t)(void *, unsigned *);
+#define KT ((volatile unsigned *)0x2000B554u)                 /* key table {msg, handler} (gp-17644) */
+#define KN (*(volatile unsigned char *)0x200045A2u)           /* entries (gp-46238) */
+#define EW ((volatile unsigned char *)0x2000AB48u)            /* edit page data block (gp-20216) */
+#define O_TURN ((kh_t)0x16E96Eu)                              /* original: encoder turn (custom firmware) */
+#define O_PUSH ((kh_t)0x1D034u)
+#define O_LEFT ((kh_t)0x1C3B0u)
+#define O_RIGHT ((kh_t)0x1C210u)
+#define O_LONG ((kh_t)0x1C0ECu)
+static void edit_state(model_t *m) { read_model(m); read_edit(m); }
+static void edit_paint(const model_t *m, int ya, int yb)
+{
+    long long cb[4]; void *old = gfx_bind(cb); u16 *buf = (u16 *)MALLOC(160 * 8 * 2); int y, ye;
+    if (buf) { for (y = ya; y <= yb; y += 8) { ye = y + 7 > yb ? yb : y + 7; gfx_begin(0, 159, y, ye, buf, &THEMES[0]); page_edit(m); FLUSH(0, 159, y, ye, buf); } FREE(buf); }
+    gfx_bind(old);
+}
+static void goto_item(int kind, int ks)
+{
+    if (kind == 0) { EW[0x2b] = 1 + ks / 3; EW[0x2c] = ks % 3; EW[0x28] = 1; }
+    else { EW[0x2b] = 0; EW[0x2c] = kind == 1 ? 0 : kind == 2 ? 1 : 2; EW[0x28] = kind != 1; }
+}
+static int next_kind(const model_t *m, int *ks)       /* knobs -> model -> mode (AMP) -> knobs */
+{
+    if (m->ekind == 0 && m->ksel + 1 < m->nk) { *ks = m->ksel + 1; return 0; }
+    if (m->ekind == 0) return 2;
+    if (m->ekind == 2 && m->sel == 3) return 3;
+    *ks = 0; return m->nk ? 0 : 2;
+}
+static int k_push(void *c, unsigned *msg)
+{
+    model_t m; int kind, ks = 0; edit_state(&m); (void)c; (void)msg;
+    kind = next_kind(&m, &ks); goto_item(kind, ks); edit_state(&m); edit_paint(&m, 32, 127);
+    return 0;
+}
+static int k_double(void *c, unsigned *msg)            /* double-push = block on/off from anywhere (the first push moved on: undo it) */
+{
+    model_t m; int kind = 0, ks = 0; edit_state(&m);
+    if (m.ekind == 0 && m.ksel > 0) { kind = 0; ks = m.ksel - 1; } else if (m.ekind == 0) kind = m.sel == 3 ? 3 : 2;
+    else if (m.ekind == 3) kind = 2; else { kind = 0; ks = m.nk ? m.nk - 1 : 0; if (!m.nk) kind = 2; }
+    goto_item(1, 0); O_PUSH(c, msg);                                                                  /* original: push on the on/off box */
+    goto_item(kind, ks); edit_state(&m); edit_paint(&m, 0, 127);
+    return 0;
+}
+static int k_turn(void *c, unsigned *msg)
+{
+    model_t m; edit_state(&m); goto_item(m.ekind, m.ksel < 0 ? 0 : m.ksel); O_TURN(c, msg); edit_state(&m);
+    if (m.ekind == 0) { edit_paint(&m, 0, 11); edit_paint(&m, 76, 127); } else edit_paint(&m, 0, 127);   /* knob: only its row + the '*' */
+    return 0;
+}
+static int k_left(void *c, unsigned *msg) { int r = O_LEFT(c, msg); model_t m; edit_state(&m); edit_paint(&m, 0, 127); return r; }
+static int k_right(void *c, unsigned *msg) { int r = O_RIGHT(c, msg); model_t m; edit_state(&m); edit_paint(&m, 0, 127); return r; }
+static int k_long(void *c, unsigned *msg) { int r = O_LONG(c, msg); model_t m; edit_state(&m); edit_paint(&m, 0, 127); return r; }
+static void edit_keys(void)
+{
+    int i, n = KN, dbl = 0; for (i = 0; i < n && i < 128; i++) { unsigned msg = KT[2 * i], h;
+        h = msg == 3 ? (unsigned)k_turn : msg == 0x30202 ? (unsigned)k_push : msg == 0x60202 ? (unsigned)k_double : (msg == 0x30002 || msg == 0x50002) ? (unsigned)k_left :
+            (msg == 0x30102 || msg == 0x50102) ? (unsigned)k_right : (msg == 0x40002 || msg == 0x40102 || msg == 0x40202 || msg == 0x48002) ? (unsigned)k_long : 0;
+        if (msg == 0x60202) dbl = 1;
+        if (h && KT[2 * i + 1] != h) KT[2 * i + 1] = h; }
+    if (!dbl && n < 127) { KT[2 * n] = 0x60202; KT[2 * n + 1] = (unsigned)k_double; KN = n + 1; }    /* add double-push */
 }
 __attribute__((section(".text.hook"))) void ui_hook(int x1, int x2, int y1, int y2, u16 *px)
 {
@@ -85,6 +151,12 @@ __attribute__((section(".text.hook"))) void ui_hook(int x1, int x2, int y1, int 
             FREE(buf); gfx_bind(old); return;
         }
         gfx_begin(x1, x2, y1, y2, px, &THEMES[0]); page_home(&m);
+    } else if (WIN == 10) {
+        /* Our handlers repaint after every action; the original's own later updates are dropped, except a top-of-screen update
+         * (page entry, preset change), which repaints the whole page once. */
+        model_t m; edit_keys(); gfx_bind(old);
+        if (y1 <= 13) { edit_state(&m); edit_paint(&m, 0, 127); }
+        return;
     }
     gfx_bind(old);
     FLUSH(x1, x2, y1, y2, px);

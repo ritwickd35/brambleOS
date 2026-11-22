@@ -12,6 +12,7 @@ const theme_t *gfx_theme(void);
 void gfx_bg(void);                                                          /* dithered vertical gradient */
 void gfx_tray(float x, float y, float w, float h, float x2, float y2, float w2, float h2, float r, rgb_t c, float a);
 void gfx_rrect(float x, float y, float w, float h, float r, rgb_t c, float a);
+void gfx_rring(float x, float y, float w, float h, float r, float th, rgb_t c, float a);
 void gfx_disc(float cx, float cy, float r, rgb_t c, float a);
 void gfx_arc(float cx, float cy, float r, float th, float a0, float a1, rgb_t c, float a);   /* degrees, 0 = right, clockwise */
 void gfx_tri(float x0, float y0, float x1, float y1, float x2, float y2, rgb_t c, float a);

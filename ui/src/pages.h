@@ -11,6 +11,8 @@ typedef struct {
     /* edit page (selected block = sel) */
     char mname[20], brand[24]; int nk; char kn[8][6]; int kv[8]; int ksel;   /* model, maker/original, knobs 0..100 */
     /* tuner */
+    int erow, ecol, eopen; int ekind;                                         /* ekind: 0 knob (ksel), 1 on/off, 2 model, 3 mode */                                                   /* edit page cursor: row (0 = block, 1.. = knob rows), column, open */
+    char dbg[24];                                                            /* debug text (edit page probe), empty = none */
     int note, octave, cents, hz10, a4, mute;                                 /* note 0..11 (C..B), -1 = no signal; hz x10 */
 } model_t;
 void page_home(const model_t *m);
