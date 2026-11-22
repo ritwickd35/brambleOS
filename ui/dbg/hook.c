@@ -71,7 +71,8 @@ static void read_edit(model_t *m)
     m->nk = k;
     /* The original numbers its boxes in one run, 3 per row: on/off, model, [mode: AMP only], then the knobs. */
     { int cell = m->erow * 3 + m->ecol, base = edit_base(m->sel, m->nk);
-      if (cell == 0) { m->ekind = 1; m->ksel = -1; } else if (cell == 1) { m->ekind = 2; m->ksel = -1; }
+      if (cell == 0) { if (m->nk) { m->ekind = 0; m->ksel = 0; } else { m->ekind = 2; m->ksel = -1; } }   /* on/off is never a stop */
+      else if (cell == 1) { m->ekind = 2; m->ksel = -1; }
       else if (cell == 2 && base == 3) { m->ekind = 3; m->ksel = -1; }                            /* 3rd box: mode / extra */
       else { m->ekind = 0; m->ksel = cell - base; if (m->ksel >= m->nk) m->ksel = 0; } }
 }
@@ -114,7 +115,7 @@ static int k_push(void *c, unsigned *msg)                    /* next item: knobs
     else if (m.ekind == 0 || m.ekind == 1) kind = 2;
     else if (m.ekind == 2 && m.sel == 3) kind = 3;                                                  /* AMP mode; other 3rd boxes are skipped */
     else { kind = m.nk ? 0 : 2; }
-    goto_item(&m, kind, ks); edit_state(&m); edit_paint(&m, 32, 127); return 0;
+    goto_item(&m, kind, ks); edit_state(&m); edit_paint(&m, 44, 127); return 0;
 }
 static int k_turn(void *c, unsigned *msg)
 {
@@ -124,8 +125,8 @@ static int k_turn(void *c, unsigned *msg)
     O_TURN(c, msg); edit_state(&m);
     if (m.ekind == 0) {
         if (old >= 0 && old != m.kv[ks]) {                                                            /* sweep: 2 frames, knob column only */
-            int nv = m.kv[ks], x0 = 22 + 39 * (ks % 4) - 19; for (i = 1; i <= 2; i++) { m.kv[ks] = old + (nv - old) * i / 3; edit_paint_r(&m, x0, x0 + 38, 79, 121); } m.kv[ks] = nv; }
-        edit_paint(&m, 0, 11); edit_paint(&m, 76, 127); return 0;
+            int nv = m.kv[ks], x0 = 22 + 39 * (ks % 4) - 19; for (i = 1; i <= 2; i++) { m.kv[ks] = old + (nv - old) * i / 3; edit_paint_r(&m, x0, x0 + 38, 86, 122); } m.kv[ks] = nv; }
+        edit_paint(&m, 0, 11); edit_paint(&m, 84, 127); return 0;
     }
     edit_paint(&m, 0, 127); return 0;
 }
