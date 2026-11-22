@@ -125,8 +125,8 @@ static int k_turn(void *c, unsigned *msg)
     O_TURN(c, msg); edit_state(&m);
     if (m.ekind == 0) {
         if (old >= 0 && old != m.kv[ks]) {                                                            /* sweep: 2 frames, knob column only */
-            int nv = m.kv[ks], x0 = 22 + 39 * (ks % 4) - 19; for (i = 1; i <= 2; i++) { m.kv[ks] = old + (nv - old) * i / 3; edit_paint_r(&m, x0, x0 + 38, 86, 122); } m.kv[ks] = nv; }
-        edit_paint(&m, 0, 11); edit_paint(&m, 84, 127); return 0;
+            int nv = m.kv[ks], x0 = 22 + 39 * (ks % 4) - 19; for (i = 1; i <= 2; i++) { m.kv[ks] = old + (nv - old) * i / 3; edit_paint_r(&m, x0, x0 + 38, 87, 124); } m.kv[ks] = nv; }
+        edit_paint(&m, 0, 11); edit_paint(&m, 85, 127); return 0;
     }
     edit_paint(&m, 0, 127); return 0;
 }
