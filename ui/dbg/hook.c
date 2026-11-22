@@ -44,9 +44,9 @@ static void cpy(char *d, const unsigned char *s, int n) { int i; for (i = 0; i <
 #define EW ((volatile unsigned char *)0x2000AB48u)            /* edit page data block (gp-20216) */
 #define BOXES ((int (*)(void *))0x337D8u)                      /* number of child widgets (the original page's boxes) */
 static int nboxes(void) { void *p = (void *)rd32(EW + 0xc); return p ? BOXES(p) : 0; }
-static int edit_base(int sel, int nk)                  /* boxes before the first knob = the original's own rule: AMP has its mode box, and any block after EQ */
-{                                                      /* (FX2, DLY, RVB) has a third box (original 0x1CFA0: chain id - 2 > 3); NR, FX1, DRV, IR, EQ have two */
-    (void)nk; return (sel == 3 || sel > 5) ? 3 : 2;
+static int edit_base(int sel, int nk)                  /* boxes before the first knob. Measured on the pedal across all reports: DRV, IR, EQ have 2; */
+{                                                      /* NR, FX1, AMP (mode box), FX2, DLY, RVB have a third box that is not a knob */
+    (void)nk; return (sel == 2 || sel == 4 || sel == 5) ? 2 : 3;
 }
 typedef float (*pget_t)(int, int);
 #define PGET ((pget_t)0x5031Cu)                               /* knob value getter (module, knob) */
@@ -135,18 +135,21 @@ static int k_hold(void *c, unsigned *msg)                    /* hold the knob = 
     goto_item(&m, 1, 0); O_PUSH(c, msg); edit_state(&m);
     goto_item(&m, kind, ks); edit_state(&m); edit_paint(&m, 0, 127); return 0;
 }
-static int on_clone(void) { int sl = EW[0x25]; return sl < 10 && M[0x63 + sl] == 9; }      /* the hidden clone entry at the end of the chain */
-static int k_left(void *c, unsigned *msg)
+/* Block movement. The original stops at both ends and keeps a hidden clone slot after RVB; we skip that slot and wrap round. */
+#define O_INC O_LEFT                                           /* key 0 handler: slot + 1 */
+#define O_DEC O_RIGHT                                          /* key 1 handler: slot - 1 */
+static int is_clone(int s) { return s >= 0 && s < 10 && M[0x63 + s] == 9; }
+static int last_real(void) { int s = 9; while (s > 0 && M[0x63 + s] == 9) s--; return s; }
+static int chain_move(void *c, unsigned *msg, int inc)
 {
-    int r = O_LEFT(c, msg); model_t m; if (on_clone()) r = O_LEFT(c, msg);                         /* skip it: NR <- wraps to RVB */
-    edit_state(&m); edit_paint(&m, 0, 127); return r;
+    int before = EW[0x25], n = 0, target, at_end = inc ? before >= last_real() : before == 0; kh_t h = inc ? O_INC : O_DEC; model_t m;
+    h(c, msg); if (is_clone(EW[0x25]) && EW[0x25] != before) h(c, msg);                            /* step over the hidden slot */
+    if (at_end && (EW[0x25] == before || is_clone(EW[0x25]))) {                                    /* hit the end: wrap round */
+        target = inc ? 0 : last_real(); while (EW[0x25] != target && n++ < 12) (EW[0x25] > target ? O_DEC : O_INC)(c, msg); }
+    edit_state(&m); edit_paint(&m, 0, 127); return 0;
 }
-static int k_right(void *c, unsigned *msg)
-{
-    int r = O_RIGHT(c, msg), n = 0; model_t m;
-    if (on_clone()) { r = O_RIGHT(c, msg); if (on_clone()) while (EW[0x25] != 0 && n++ < 12) O_LEFT(c, msg); }   /* RVB -> NR */
-    edit_state(&m); edit_paint(&m, 0, 127); return r;
-}
+static int k_left(void *c, unsigned *msg) { return chain_move(c, msg, 1); }
+static int k_right(void *c, unsigned *msg) { return chain_move(c, msg, 0); }
 static int k_long(void *c, unsigned *msg) { int r = O_LONG(c, msg); model_t m; edit_state(&m); edit_paint(&m, 0, 127); return r; }
 static void edit_keys(void)
 {
