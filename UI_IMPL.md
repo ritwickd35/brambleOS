@@ -199,3 +199,12 @@ ui6 (float gfx, state on stack + r10, -ffixed-$r10) stable: the hang was the RAM
   0x3/0x50102 = ◁/▷ click/repeat, 0x4xx02 long, 0x38002 leave. Our handlers set the original's cursor/open flag and call the
   original handlers (turn 0x16E96E, push 0x1D034, ◁ 0x1C3B0, ▷ 0x1C210, long 0x1C0EC), then repaint.
 - Partial updates from the original are dropped on window 10; only a top-of-screen update repaints the page.
+- Tuner (window 3): the original's update (cb3 0x2B458) calls a draw function with the fresh result (struct from 0x120000:
+  bytes [5] note, [7] octave?, float [8] -> cents, [0..3] float = frequency?). build_ui.py redirects the two draw calls
+  (0x2B4A4 signal -> tuner_sig, 0x2B4BE no signal -> tuner_nosig). Note numbering (0 = C?) and the Hz field are UNVERIFIED.
+- Looper / drums / settings getters (all bytes near M): looper 0x500D8 (M+0x33), 0x50110 (M+0x45); drums 0x501A0 (M+0x38),
+  0x501D8 (M+0x251 != 0); settings 0x50008 (M+0x11), 0x50034 (M+0x14), 0x50060 (M+0x15), 0x50088 (M+0x44). Meanings need
+  an on-pedal probe. Looper state/time are not among them (draw helper 0x20828).
+- Home: engine load is not reported by the DSP -> one CPU ring with the value inside, label "CPU" (inner ring only if known).
+- Space: 31 KB of 32 KB used with the tuner; the looper/drums/settings/dialog pages (page_misc.c, host only) need ~4 KB more:
+  drop FONT9 (use FONT8) and trim glyph tables first.

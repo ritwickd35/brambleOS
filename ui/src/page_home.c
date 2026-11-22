@@ -25,8 +25,9 @@ static void load_rings(float cx, float cy, int cpu, int eng)
 {   /* outer ring = DSP CPU, inner ring = audio engine; a ring turns red above 85 %. No numbers here (no room to say which
      * is which); the exact values belong on a page with space. */
     const theme_t *t = gfx_theme(); rgb_t cc = cpu > 84 ? t->warn : t->on, ec = eng > 84 ? t->warn : t->ring;
-    ring(cx, cy, 8.5f, cpu, cc); ring(cx, cy, 4.8f, eng, ec);
-    gfx_text(cx, 118, "LOAD", &FONT7, (cpu > 84 || eng > 84) ? t->warn : t->sub, "mm", 1);
+    if (eng >= 0) { ring(cx, cy, 8.5f, cpu, cc); ring(cx, cy, 4.8f, eng, ec); }
+    else { char b[8]; ring(cx, cy, 8.5f, cpu, cc); if (cpu >= 0) { num(b, cpu, ""); gfx_text(cx, cy, b, &FONT7, t->text, "mm", 1); } }   /* engine load not available: one ring, value inside */
+    gfx_text(cx, 118, eng >= 0 ? "LOAD" : "CPU", &FONT7, (cpu > 84 || eng > 84) ? t->warn : t->sub, "mm", 1);
 }
 void page_home(const model_t *m)
 {
