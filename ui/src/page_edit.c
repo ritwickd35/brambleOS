@@ -36,8 +36,12 @@ void page_edit(const model_t *m)
     int page = (k == 0 && m->ksel > 0) ? m->ksel / 4 : 0, n = m->nk - page * 4; if (n > 4) n = 4;
     for (int c = 0; c < n; c++) { int i = page * 4 + c, hl = k == 0 && i == m->ksel; float cx = 22 + 39 * c, cy = 96; rgb_t col = hl ? t->ring : t->sub;
         if (hl) gfx_rrect(cx - 18, 79, 36, 41, 8, t->ring, 0.22f);
-        gfx_arc(cx, cy, 11, 3, 135, 45, t->track, 1); if (m->kv[i] > 0) gfx_arc(cx, cy, 11, 3, 135, 135 + 2.7f * m->kv[i], col, 1);
-        itoa2(m->kv[i], b); gfx_text(cx, cy, b, &FONT9, hl ? t->text : t->sub, "mm", 1); gfx_text(cx, 113, m->kn[i], &FONT7, col, "mm", 1); }
+        if (m->kmx[i] == 1) {                                                                   /* on/off knob: a switch */
+            int on1 = m->kraw[i] > 0; gfx_rrect(cx - 11, cy - 5, 22, 10, 5, on1 ? (hl ? t->ring : t->on) : t->track, 1); gfx_disc(on1 ? cx + 6 : cx - 6, cy, 3.6f, RGB(255, 255, 255), 1);
+        } else {
+            gfx_arc(cx, cy, 11, 3, 135, 45, t->track, 1); if (m->kv[i] > 0) gfx_arc(cx, cy, 11, 3, 135, 135 + 2.7f * m->kv[i], col, 1);
+            itoa2(m->kmx[i] > 1 && m->kmx[i] <= 30 ? m->kraw[i] : m->kv[i], b); gfx_text(cx, cy, b, &FONT9, hl ? t->text : t->sub, "mm", 1); }
+        gfx_text(cx, 113, m->kn[i], &FONT7, col, "mm", 1); }
     /* page dots */
     int pages = (m->nk + 3) / 4; for (int p = 0; p < pages && pages > 1; p++) gfx_disc(80 - 3 * (pages - 1) + 6 * p, 124, 1.6f, p == page ? t->ring : t->track, 1);
 }

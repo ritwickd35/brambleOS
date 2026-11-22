@@ -44,11 +44,9 @@ static void cpy(char *d, const unsigned char *s, int n) { int i; for (i = 0; i <
 #define EW ((volatile unsigned char *)0x2000AB48u)            /* edit page data block (gp-20216) */
 #define BOXES ((int (*)(void *))0x337D8u)                      /* number of child widgets (the original page's boxes) */
 static int nboxes(void) { void *p = (void *)rd32(EW + 0xc); return p ? BOXES(p) : 0; }
-static int edit_base(int sel, int nk)                  /* boxes before the first knob: page box count - knobs (2 or 3) */
+static int edit_base(int sel, int nk)                  /* boxes before the first knob: the original's own rule (0x1CFA0 + AMP mode box) */
 {
-    int nb = nboxes(), b = nb - nk;
-    if (nb > 0 && (b == 2 || b == 3)) return b;
-    return (sel == 1 || sel == 3 || sel == 6) ? 3 : 2;                                          /* FX1, AMP, FX2 have a 3rd box */
+    (void)nk; return (sel == 3 || sel >= 6) ? 3 : 2;      /* AMP, FX2, DLY, RVB have a third box; NR, FX1, DRV, IR, EQ do not */
 }
 typedef float (*pget_t)(int, int);
 #define PGET ((pget_t)0x5031Cu)                               /* knob value getter (module, knob) */
@@ -68,7 +66,7 @@ static void read_edit(model_t *m)
         const unsigned char *kr = r + 16 + 24 * k; unsigned noff = kr[2] | (kr[3] << 8);
         float mn = f32(rd32(kr + 4)), mx = f32(rd32(kr + 8)), v = PGET(mod, k);                       /* the pedal's own knob -> value mapping */
         int pct = mx > mn ? (int)((v - mn) * 100.0f / (mx - mn) + 0.5f) : 0;
-        cpy(m->kn[k], sb + noff, sizeof m->kn[k]); m->kv[k] = pct < 0 ? 0 : pct > 100 ? 100 : pct;
+        cpy(m->kn[k], sb + noff, sizeof m->kn[k]); m->kv[k] = pct < 0 ? 0 : pct > 100 ? 100 : pct; m->kmx[k] = (int)(mx + 0.5f); m->kraw[k] = (int)(v + 0.5f);
     }
     m->nk = k;
     /* The original numbers its boxes in one run, 3 per row: on/off, model, [mode: AMP only], then the knobs. */
@@ -137,8 +135,18 @@ static int k_hold(void *c, unsigned *msg)                    /* hold the knob = 
     goto_item(&m, 1, 0); O_PUSH(c, msg); edit_state(&m);
     goto_item(&m, kind, ks); edit_state(&m); edit_paint(&m, 0, 127); return 0;
 }
-static int k_left(void *c, unsigned *msg) { int r = O_LEFT(c, msg); model_t m; edit_state(&m); edit_paint(&m, 0, 127); return r; }
-static int k_right(void *c, unsigned *msg) { int r = O_RIGHT(c, msg); model_t m; edit_state(&m); edit_paint(&m, 0, 127); return r; }
+static int on_clone(void) { int sl = EW[0x25]; return sl < 10 && M[0x63 + sl] == 9; }      /* the hidden clone entry at the end of the chain */
+static int k_left(void *c, unsigned *msg)
+{
+    int r = O_LEFT(c, msg); model_t m; if (on_clone()) r = O_LEFT(c, msg);                         /* skip it: NR <- wraps to RVB */
+    edit_state(&m); edit_paint(&m, 0, 127); return r;
+}
+static int k_right(void *c, unsigned *msg)
+{
+    int r = O_RIGHT(c, msg), n = 0; model_t m;
+    if (on_clone()) { r = O_RIGHT(c, msg); if (on_clone()) while (EW[0x25] != 0 && n++ < 12) O_LEFT(c, msg); }   /* RVB -> NR */
+    edit_state(&m); edit_paint(&m, 0, 127); return r;
+}
 static int k_long(void *c, unsigned *msg) { int r = O_LONG(c, msg); model_t m; edit_state(&m); edit_paint(&m, 0, 127); return r; }
 static void edit_keys(void)
 {
