@@ -88,7 +88,9 @@ typedef int (*kh_t)(void *, unsigned *);
 #define O_LEFT ((kh_t)0x1C3B0u)
 #define O_RIGHT ((kh_t)0x1C210u)
 #define O_LONG ((kh_t)0x1C0ECu)
-static void edit_state(model_t *m) { read_model(m); read_edit(m); }
+static const float EASE[3] = {0.4f, 0.75f, 0.93f};      /* ease-out steps for the 3 in-between frames */
+#define DELAY ((void (*)(unsigned))0x687CCu)                    /* task delay in ms: paces the animation frames */
+static void edit_state(model_t *m) { read_model(m); read_edit(m); m->hlx = m->rgx = m->rgy = 0; m->pulse = 0; }
 static void paint(void (*pg)(const model_t *), const model_t *m, int ya, int yb)
 {
     long long cb[4]; void *old = gfx_bind(cb); u16 *buf = (u16 *)MALLOC(160 * 8 * 2); int y, ye;
@@ -115,17 +117,22 @@ static int k_push(void *c, unsigned *msg)                    /* next item: knobs
     else if (m.ekind == 0 || m.ekind == 1) kind = 2;
     else if (m.ekind == 2 && m.sel == 3) kind = 3;                                                  /* AMP mode; other 3rd boxes are skipped */
     else { kind = m.nk ? 0 : 2; }
-    goto_item(&m, kind, ks); edit_state(&m); edit_paint(&m, 44, 127); return 0;
+    { int ok = m.ekind, oks = m.ksel, f; goto_item(&m, kind, ks); edit_state(&m);
+      if (ok == 0 && m.ekind == 0 && oks != m.ksel && oks / 4 == m.ksel / 4) {                        /* the highlight glides to the next knob */
+          float x0 = 22 + 39 * (oks % 4), x1 = 22 + 39 * (m.ksel % 4); for (f = 0; f < 3; f++) { m.hlx = x0 + (x1 - x0) * EASE[f]; edit_paint(&m, 85, 127); DELAY(12); } m.hlx = 0; }
+      edit_paint(&m, 44, 127); return 0; }
 }
 static int k_turn(void *c, unsigned *msg)
 {
-    model_t m; int i, ks, old = -1; edit_state(&m);
+    model_t m; int i, ks, old = -1, oldr = 0; edit_state(&m);
     if (m.ekind == 1) { goto_item(&m, m.nk ? 0 : 2, 0); edit_state(&m); }                           /* never edit on/off by turning */
-    goto_item(&m, m.ekind, m.ksel < 0 ? 0 : m.ksel); ks = m.ksel; if (m.ekind == 0) old = m.kv[ks];
+    goto_item(&m, m.ekind, m.ksel < 0 ? 0 : m.ksel); ks = m.ksel; if (m.ekind == 0) { old = m.kv[ks]; oldr = m.kraw[ks]; }
     O_TURN(c, msg); edit_state(&m);
     if (m.ekind == 0) {
-        if (old >= 0 && old != m.kv[ks]) {                                                            /* sweep: 2 frames, knob column only */
-            int nv = m.kv[ks], x0 = 22 + 39 * (ks % 4) - 19; for (i = 1; i <= 2; i++) { m.kv[ks] = old + (nv - old) * i / 3; edit_paint_r(&m, x0, x0 + 38, 87, 124); } m.kv[ks] = nv; }
+        if (old >= 0 && old != m.kv[ks]) {                                                            /* the ring and number glide to the new value */
+            int nv = m.kv[ks], nr = m.kraw[ks], x0 = 22 + 39 * (ks % 4) - 19;
+            for (i = 0; i < 3; i++) { m.kv[ks] = old + (int)((nv - old) * EASE[i]); m.kraw[ks] = oldr + (int)((nr - oldr) * EASE[i]); edit_paint_r(&m, x0, x0 + 38, 87, 124); DELAY(10); }
+            m.kv[ks] = nv; m.kraw[ks] = nr; }
         edit_paint(&m, 0, 11); edit_paint(&m, 85, 127); return 0;
     }
     edit_paint(&m, 0, 127); return 0;
@@ -134,20 +141,26 @@ static int k_hold(void *c, unsigned *msg)                    /* hold the knob = 
 {
     model_t m; int kind, ks; edit_state(&m); kind = m.ekind == 1 ? 0 : m.ekind; ks = m.ksel < 0 ? 0 : m.ksel;
     goto_item(&m, 1, 0); O_PUSH(c, msg); edit_state(&m);
-    goto_item(&m, kind, ks); edit_state(&m); edit_paint(&m, 0, 127); return 0;
+    goto_item(&m, kind, ks); edit_state(&m);
+    { int f; for (f = 1; f <= 3; f++) { m.pulse = f; edit_paint_r(&m, 108, 159, 40, 82); DELAY(30); } m.pulse = 0; }      /* a ring ripples out from the on/off badge */
+    edit_paint(&m, 0, 127); return 0;
 }
 /* Block movement. The original stops at both ends and keeps a hidden clone slot after RVB; we skip that slot and wrap round. */
 #define O_INC O_LEFT                                           /* key 0 handler: slot + 1 */
 #define O_DEC O_RIGHT                                          /* key 1 handler: slot - 1 */
 static int is_clone(int s) { return s >= 0 && s < 10 && M[0x63 + s] == 9; }
 static int last_real(void) { int s = 9; while (s > 0 && M[0x63 + s] == 9) s--; return s; }
+static void tile_xy(const model_t *m, int blk, float *x, float *y) { int j; for (j = 0; j < 9 && m->order[j] != blk; j++) ; if (j > 8) j = blk; *x = 4 + (j % 5) * 31; *y = 13 + (j / 5) * 16; }
 static int chain_move(void *c, unsigned *msg, int inc)
 {
-    int before = EW[0x25], n = 0, target, at_end = inc ? before >= last_real() : before == 0; kh_t h = inc ? O_INC : O_DEC; model_t m;
+    int before = EW[0x25], n = 0, target, at_end = inc ? before >= last_real() : before == 0, f; kh_t h = inc ? O_INC : O_DEC; model_t m, m0; edit_state(&m0);
     h(c, msg); if (is_clone(EW[0x25]) && EW[0x25] != before) h(c, msg);                            /* step over the hidden slot */
     if (at_end && (EW[0x25] == before || is_clone(EW[0x25]))) {                                    /* hit the end: wrap round */
         target = inc ? 0 : last_real(); while (EW[0x25] != target && n++ < 12) (EW[0x25] > target ? O_DEC : O_INC)(c, msg); }
-    edit_state(&m); edit_paint(&m, 0, 127); return 0;
+    edit_state(&m);
+    if (m.sel != m0.sel) { float x0, y0, x1, y1; tile_xy(&m0, m0.sel, &x0, &y0); tile_xy(&m, m.sel, &x1, &y1);      /* the ring glides to the new block */
+        for (f = 0; f < 3; f++) { m.rgx = x0 + (x1 - x0) * EASE[f]; m.rgy = y0 + (y1 - y0) * EASE[f]; edit_paint(&m, 10, 45); DELAY(14); } m.rgx = 0; }
+    edit_paint(&m, 0, 127); return 0;
 }
 static int k_left(void *c, unsigned *msg) { return chain_move(c, msg, 1); }
 static int k_right(void *c, unsigned *msg) { return chain_move(c, msg, 0); }

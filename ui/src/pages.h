@@ -11,6 +11,7 @@ typedef struct {
     /* edit page (selected block = sel) */
     char mname[20], brand[24]; int nk; char kn[8][6]; int kv[8], kmx[8], kraw[8]; int ksel;   /* kv = 0..100 %, kmx = range top, kraw = raw value */   /* model, maker/original, knobs 0..100 */
     /* tuner */
+    float hlx, rgx, rgy; int pulse;                                          /* animation overrides (0 = none): knob highlight x, chain ring x/y, on/off pulse 1..3 */
     int erow, ecol, eopen; int ekind;                                         /* ekind: 0 knob (ksel), 1 on/off, 2 model, 3 mode */                                                   /* edit page cursor: row (0 = block, 1.. = knob rows), column, open */
     /* recording / looper */
     int rstate, rtime10, rpost, rvol, pvol, rsel;                            /* rstate 0 empty, 1 rec, 2 play, 3 stop; time in 0.1 s */

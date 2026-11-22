@@ -13,7 +13,7 @@ static rgb_t dim(rgb_t c, const theme_t *t) { int l = (c.r * 3 + c.g * 6 + c.b) 
 static void ring(float x, float y, float w, float h, float r) { const theme_t *t = gfx_theme(); gfx_rring(x - 2, y - 2, w + 4, h + 4, r + 2, 2.2f, t->ring, 1); }
 void page_edit(const model_t *m)
 {
-    const theme_t *t = gfx_theme(); char b[24]; int sel = m->sel < 0 ? 0 : m->sel, on = m->on[sel], k = m->ekind, sx = 0, sy = 0;
+    const theme_t *t = gfx_theme(); char b[24]; int sel = m->sel < 0 ? 0 : m->sel, on = m->on[sel], k = m->ekind; float sx = 0, sy = 0;
     rgb_t trk = t->dark ? rgbf(t->bg1, RGB(10, 0, 14), 0.66f) : rgbf(t->bg1, t->text, 0.26f);        /* inactive part: dark */
     rgb_t act = t->dark ? rgbf(t->ring, RGB(255, 255, 255), 0.38f) : t->ring;                        /* active part: bright */
     gfx_bg();
@@ -23,9 +23,10 @@ void page_edit(const model_t *m)
     if (m->edited) gfx_text(32 + gfx_text_w(&FONT9, m->name) + 2, 6, "*", &FONT9, t->sub, "lm", 1);
     /* chain: 2 rows of wide tiles */
     for (int j = 0; j < 9; j++) { int i = m->order[j] < 9 ? m->order[j] : j, o = m->on[i]; float x = 4 + (j % 5) * 31, y = 13 + (j / 5) * 16; rgb_t c = o ? GC[i] : dim(GC[i], t);
-        if (i == sel) { sx = (int)x; sy = (int)y; }
+        if (i == sel) { sx = x; sy = y; }
         gfx_rrect(x, y, 28, 13, 4, c, 1); if (o) gfx_rrect(x + 1, y + 1, 26, 5, 3, RGB(255, 255, 255), 0.18f);
         gfx_text(x + 14, y + 7, LAB[i], &FONT9, o ? RGB(255, 255, 255) : (t->dark ? RGB(150, 130, 150) : RGB(120, 110, 115)), "mm", 1); }
+    if (m->rgx > 0) { sx = m->rgx; sy = m->rgy; }
     gfx_rring(sx - 2.5f, sy - 2.5f, 33, 18, 6.5f, 2, t->ring, 1);
     /* model card */
     gfx_rrect(4, 45, 152, 39, 7, t->dark ? RGB(20, 0, 24) : t->text, t->dark ? 0.30f : 0.07f);
@@ -35,13 +36,14 @@ void page_edit(const model_t *m)
     gfx_text(50, 64, m->mname, gfx_text_w(&FONT16, m->mname) <= 64 ? &FONT16 : &FONT12, t->text, "lm", 1);
     if (m->brand[0]) gfx_text(50, 76.5f, m->brand, &FONT7, t->sub, "lm", 1);
     gfx_pill(122, 50, 30, 13, on ? "ON" : "OFF", &FONT9, on, on ? t->on : t->track);
+    if (m->pulse > 0) gfx_rring(122 - 2.2f * m->pulse, 50 - 2.2f * m->pulse, 30 + 4.4f * m->pulse, 13 + 4.4f * m->pulse, 6.5f + 2.2f * m->pulse, 1.8f, on ? t->on : t->sub, 0.9f - 0.27f * m->pulse);
     if (sel == 3) { if (k == 3) ring(118, 68, 34, 12, 6);
         gfx_rrect(118, 68, 34, 12, 6, trk, 1); gfx_rrect(m->nam ? 135 : 119, 69, 16, 10, 5, act, 1);
         gfx_text(127, 74, "B", &FONT7, m->nam ? t->sub : t->ink, "mm", 1); gfx_text(143, 74, "N", &FONT7, m->nam ? t->ink : t->sub, "mm", 1); }
     /* knobs: 4 per page; the page follows the highlighted knob */
     int page = (k == 0 && m->ksel > 0) ? m->ksel / 4 : 0, n = m->nk - page * 4; if (n > 4) n = 4;
+    if (k == 0 && m->ksel >= page * 4 && m->ksel < page * 4 + 4) gfx_rrect((m->hlx > 0 ? m->hlx : 22 + 39 * (m->ksel - page * 4)) - 18, 87, 36, 36, 8, t->ring, 0.25f);
     for (int c = 0; c < n; c++) { int i = page * 4 + c, hl = k == 0 && i == m->ksel; float cx = 22 + 39 * c, cy = 100;
-        if (hl) gfx_rrect(cx - 18, 87, 36, 36, 8, t->ring, 0.25f);
         if (m->kmx[i] == 1) {                                                                       /* on/off knob: a switch */
             int on1 = m->kraw[i] > 0; gfx_rrect(cx - 11, cy - 5, 22, 10, 5, on1 ? act : trk, 1); gfx_disc(on1 ? cx + 6 : cx - 6, cy, 3.6f, RGB(255, 255, 255), 1);
         } else {

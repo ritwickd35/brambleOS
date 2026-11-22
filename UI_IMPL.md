@@ -212,3 +212,13 @@ ui6 (float gfx, state on stack + r10, -ffixed-$r10) stable: the hang was the RAM
   row*3+col; cell 0 = on/off, 1 = model; knob = cell - 2, except AMP (id 3: mode box at cell 2, knob = cell - 3) and any
   block whose chain id > 5 (FX2, DLY, RVB: 0x1CFA0 = (id - 2) > 3), where knob = cell - 3. So base = 3 for AMP/FX2/DLY/RVB,
   2 for NR/FX1/DRV/IR/EQ. The hidden clone entry (chain id 9) sits after RVB; ◁/▷ skip it.
+
+## More room: the old edit page's chain pictures (2026-11-22, build ui50)
+- The 19 chain-strip pictures (33x47, RGB565+alpha, 88.7 KB at flash offsets 0xEAAD0..0x100541) were only used by the edit
+  page we replaced (table of 18 descriptor pointers at 0x15B328, plus one code immediate at 0x1CC00 for the 19th = 0xFF308
+  which stays). tools/build_ui.py now puts the UI code at CPU 0xFAB00 (flash 0xEAB00, link base in ui/dbg/link.ld), moves the
+  18 descriptors behind the code and re-points the table; the descriptors' data pointers stay (they read our code as pixels,
+  harmless: the flushes of window 10 are dropped). Usable code size: ~80 KB (to 0xFF200) instead of 32 KB; the MCU section
+  size is unchanged (0x167F50), so the 0x170000 limit no longer matters. The old logic of the edit page cannot go: we drive it.
+- Animations (edit page): knob ring/number glide (3 frames), highlight glide on push, block ring glide on ◁/▷, ripple on
+  on/off; frames paced with the pedal's delay function 0x687CC(ms).

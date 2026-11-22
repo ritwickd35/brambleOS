@@ -15,9 +15,19 @@ def main():
     code = open(os.path.join(srcdir, "ui.bin"), "rb").read(); sym = {l.split()[2]: int(l.split()[0], 16) for l in open(os.path.join(srcdir, "ui.sym")) if len(l.split()) == 3}
     out = os.path.join(RE, "build", name); shutil.rmtree(out, ignore_errors=True); shutil.copytree(os.path.join(RE, base) if not os.path.isabs(base) else base, out)
     p = os.path.join(out, "src", "3_mcu_app_00000000.bin"); b = bytearray(open(p, "rb").read())
-    assert len(b) <= 0x168000 and len(code) <= 0x18000, (hex(len(b)), len(code))
+    base = min(a for n, a in sym.items() if n == "ui_hook"); cpu0 = int(open(os.path.join(srcdir, "link.ld")).read().split("=")[1].split(";")[0].split()[0], 16)
+    assert len(b) <= 0x168000 and len(code) <= 0x14800, (hex(len(b)), len(code))
     o = 0x16BD54 - 0x10000; assert b[o:o + 6] == bytes.fromhex("44550be8dd25"), b[o:o + 6].hex()
-    b += b"\xff" * (0x168000 - len(b)); b += code
+    ICON_LO, ICON_HI = 0xEAB00, 0xFF200            # file offsets: pictures of the old edit page's chain strip (never drawn any more)
+    if ICON_LO <= cpu0 - 0x10000 < ICON_HI:        # code goes INTO the old pictures: no growth of the section, ~80 KB of room
+        off = cpu0 - 0x10000; end = (off + len(code) + 3) & ~3; assert end + 18 * 12 <= ICON_HI, (hex(end), "code too big for the picture area")
+        dsc = []                                   # the 18 picture descriptors (12 bytes each) move behind the code; the table pointing at them follows
+        for k in range(18):
+            t = 0x15B328 + 4 * k; w = struct.unpack_from("<I", b, t)[0] - 0x10000; assert ICON_LO - 0x100 <= w < ICON_HI, hex(w); dsc.append(bytes(b[w:w + 12]))
+        b[off:off + len(code)] = code
+        for k in range(18): b[end + 12 * k:end + 12 * k + 12] = dsc[k]; struct.pack_into("<I", b, 0x15B328 + 4 * k, end + 12 * k + 0x10000)
+    else:
+        b += b"\xff" * (0x168000 - len(b)); b += code
     b[o:o + 4] = struct.pack(">I", 0x49000000 | (((sym["ui_hook"] - 0x16BD54) // 2) & 0xFFFFFF)); b[o + 4:o + 6] = bytes.fromhex("9200")
     def jal(at, old, new):                                  # redirect one `jal old` (4 bytes) at CPU address `at` to our function `new`
         q = at - 0x10000; want = struct.pack(">I", 0x49000000 | (((old - at) // 2) & 0xFFFFFF)); assert b[q:q + 4] == want, (hex(at), b[q:q + 4].hex())
