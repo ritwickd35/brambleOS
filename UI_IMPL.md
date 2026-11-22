@@ -208,3 +208,7 @@ ui6 (float gfx, state on stack + r10, -ffixed-$r10) stable: the hang was the RAM
 - Home: engine load is not reported by the DSP -> one CPU ring with the value inside, label "CPU" (inner ring only if known).
 - Space: 31 KB of 32 KB used with the tuner; the looper/drums/settings/dialog pages (page_misc.c, host only) need ~4 KB more:
   drop FONT9 (use FONT8) and trim glyph tables first.
+- Edit page box rule (from the original's turn handler 0x1D198 / helper 0x1CFA0, NOT from user reports): cells are numbered
+  row*3+col; cell 0 = on/off, 1 = model; knob = cell - 2, except AMP (id 3: mode box at cell 2, knob = cell - 3) and any
+  block whose chain id > 5 (FX2, DLY, RVB: 0x1CFA0 = (id - 2) > 3), where knob = cell - 3. So base = 3 for AMP/FX2/DLY/RVB,
+  2 for NR/FX1/DRV/IR/EQ. The hidden clone entry (chain id 9) sits after RVB; ◁/▷ skip it.
