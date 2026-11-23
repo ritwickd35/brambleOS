@@ -33,7 +33,9 @@ void page_home(const model_t *m)
 {
     const theme_t *t = gfx_theme(); char b[16]; static const char *const lab[9] = {"NR", "FX1", "DRV", "AMP", "IR", "EQ", "FX2", "DLY", "RVB"};
     gfx_bg();
+    if (m->hfocus == 0) gfx_rring(1.5f, 0.5f, 28, 13, 6.5f, 1.8f, t->ring, 1);                                    /* the encoder controls Bluetooth */
     if (m->bt >= 0) { gfx_pill(3, 2, 24, 10, "BT", &FONT7, m->bt, m->bt ? t->ring : t->track); if (m->bt) gfx_disc(8, 7, 1.8f, t->on, 1); }
+    if (m->hfocus == 1) gfx_rring(29, 0.5f, 66, 13, 6.5f, 1.8f, t->ring, 1);                                    /* ... or the volume */
     if (m->vol >= 0) { speaker(31, 2, t->text); gfx_bar(43, 5, 40, 5, m->vol / 100.0f, t->ring); num(b, m->vol, ""); gfx_text(86, 7.5f, b, &FONT7, t->text, "lm", 1); }
     if (m->bat >= 0) { battery(138, 2, m->bat, m->chg); }
     /* preset row: arrow + P-pill + name, centred as one group */

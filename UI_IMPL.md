@@ -222,3 +222,7 @@ ui6 (float gfx, state on stack + r10, -ffixed-$r10) stable: the hang was the RAM
   size is unchanged (0x167F50), so the 0x170000 limit no longer matters. The old logic of the edit page cannot go: we drive it.
 - Animations (edit page): knob ring/number glide (3 frames), highlight glide on push, block ring glide on ◁/▷, ripple on
   on/off; frames paced with the pedal's delay function 0x687CC(ms).
+- Home status values (measured on the pedal, 2026-11-23): master volume = float at settings +0x0A (0x2000CEEE) as a fraction
+  0..1 (0.79 = 79); Bluetooth on = byte 0x20005800 (0/1; 0xFF in 0x200084B8/B9 = "never connected" at boot); the encoder's
+  focus on the home screen = settings +0x10 (2 = default; mapping 0 BT / 1 volume / 2 preset is a guess from the manual's order).
+  The home window's key list (0x22xxx): turn 0x22D58, push 0x22590, long 0x22578 - untouched, they still work under our page.

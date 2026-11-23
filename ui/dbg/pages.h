@@ -3,6 +3,7 @@
 #include "gfx.h"
 typedef struct {
     int preset; char name[24]; int edited;          /* current preset 1..100, name, unsaved changes */
+    int hfocus;                                                             /* home: what the encoder controls: 0 Bluetooth, 1 volume, 2 preset */
     int vol, bt, bat, chg;  /* -1 = not known (element not drawn) */                         /* master volume 0..100, Bluetooth on, battery 0..100, charging */
     int cpu, eng, bpm;                              /* DSP load %, engine load %, tempo */
     u8 on[9];                                       /* NR FX1 DRV AMP IR EQ FX2 DLY RVB : block enabled */

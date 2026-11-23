@@ -27,7 +27,9 @@ static void read_model(model_t *m)
     { int n = 0, k; for (i = 0; i < 10 && n < 9; i++) { k = M[0x63 + i]; if (k < 9) m->order[n++] = k; }    /* chain order (getter 0x50280) */
       if (n != 9) for (i = 0; i < 9; i++) m->order[i] = i; }
     m->nam = (en >> 3) & (en >> 9) & 1; m->sel = -1;
-    { union { unsigned u; float f; } v; v.u = M[0x0A] | (M[0x0B] << 8) | (M[0x0C] << 16) | ((unsigned)M[0x0D] << 24); m->vol = v.f >= 0.0f && v.f <= 100.5f ? (int)(v.f + 0.5f) : -1; }   /* the float the stock home reads (getter 0x4FF48) */
+    { union { unsigned u; float f; } v; v.u = M[0x0A] | (M[0x0B] << 8) | (M[0x0C] << 16) | ((unsigned)M[0x0D] << 24); m->vol = v.f >= 0.0f && v.f <= 1.005f ? (int)(v.f * 100.0f + 0.5f) : -1; }   /* master volume: a fraction 0..1 at settings +0A (measured: 0.79, 0.80, 0.81 = 79, 80, 81) */
+    m->bt = *(volatile unsigned char *)0x20005800u ? 1 : 0;                                                    /* Bluetooth on (measured: 0 off, 1 on) */
+    m->hfocus = M[0x10] <= 2 ? M[0x10] : 2;                                                                    /* encoder focus at settings +10 (0 BT, 1 volume, 2 preset: to be confirmed) */
     { unsigned lv = *(volatile unsigned char *)0x200084A9u; m->bat = (lv > 5 ? 5 : lv) * 20; }               /* battery level 0..5 (getter 0x14800) */
     m->chg = *(volatile unsigned char *)0x200084ACu == 2;                                                      /* 2 = USB power in */
     m->edited = *(volatile unsigned char *)0x2000D134u != 0;                                                   /* unsaved changes (stock draws its '*' from this) */
@@ -224,7 +226,7 @@ static void probe_paint(void)
         FREE(buf); }
     gfx_bind(old);
 }
-#define OUR_HOME 0                                      /* 1 = the Berry home page; 0 = the original, whose encoder cycles Bluetooth / volume / preset */
+#define OUR_HOME 1                                      /* 1 = the Berry home page; 0 = the original, whose encoder cycles Bluetooth / volume / preset */
 __attribute__((section(".text.hook"))) void ui_hook(int x1, int x2, int y1, int y2, u16 *px)
 {
     long long ctxbuf[4]; void *old = gfx_bind(ctxbuf);
