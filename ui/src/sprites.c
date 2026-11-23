@@ -2,7 +2,7 @@
 #include "pages.h"
 #define RGB(r, g, b) ((rgb_t){r, g, b})
 static rgb_t lite(rgb_t c, int lit)   /* off = grey and faded, so on/off reads at a glance (also on a poor-angle screen) */
-{ const theme_t *t = gfx_theme(); if (lit) return c; int l = (c.r * 3 + c.g * 6 + c.b) / 10; if (t->dark) { l = l * 22 / 100 + 50; return RGB(l, l * 9 / 10, l); } l = l / 6 + 190; return RGB(l, l, l); }
+{ const theme_t *t = gfx_theme(); if (lit) return c; int l = (c.r * 3 + c.g * 6 + c.b) / 10; if (t->dark) { l = l * 22 / 100 + 50; return RGB(l, l * 9 / 10, l); } l = l * 28 / 100 + 112; return RGB(l, l, l); }
 static void shine(float cx, float cy, float r, rgb_t c, int lit) { gfx_disc(cx, cy, r, c, 1); gfx_disc(cx - r * 0.3f, cy - r * 0.35f, r * 0.4f, RGB(255, 255, 255), lit ? 0.35f : 0.15f); }
 static void pedal(float x, float y, rgb_t body, int lit, int knobs)
 {
