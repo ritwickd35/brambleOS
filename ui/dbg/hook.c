@@ -243,6 +243,7 @@ __attribute__((section(".text.hook"))) void ui_hook(int x1, int x2, int y1, int 
         read_model(&m); buf = (u16 *)MALLOC(160 * SH * 2);
         if (buf) {
             if (ys > 0 && y1 <= 13) ys = 0;
+            if (ys > 13) { gfx_begin(0, 159, 0, 13, buf, UITH); page_home(&m); FLUSH(0, 159, 0, 13, buf); }   /* the header (Bluetooth, volume, battery) refreshes on every update, wherever the original draws */
             for (y = ys; y <= ye; y += SH) { int e = y + SH - 1 > ye ? ye : y + SH - 1;
                 gfx_begin(0, 159, y, e, buf, UITH); page_home(&m); FLUSH(0, 159, y, e, buf); }
             FREE(buf); gfx_bind(old); return;
