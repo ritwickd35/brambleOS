@@ -273,6 +273,7 @@ __attribute__((section(".text.hook"))) void ui_hook(int x1, int x2, int y1, int 
         /* Header and preset row: whole band (the stock name label sits elsewhere). Block rows: only the flushed rows,
          * full width - the stock code walks every changed icon top to bottom, so all rows get refreshed once. */
         ys = z0 <= 1 ? zs[z0] : y1; ye = z1 <= 1 ? ze[z1] : y2;
+        if (z1 >= 3) { if (ys > 85) ys = 85; ye = 127; }                                           /* bottom block row + load ring: always redrawn whole, or a number is half old, half new */
         read_model(&m); buf = (u16 *)MALLOC(160 * SH * 2);
         if (buf) {
             if (ys > 0 && y1 <= 13) ys = 0;
