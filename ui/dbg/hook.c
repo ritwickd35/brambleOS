@@ -264,13 +264,12 @@ static unsigned find_names(void)
     for (p = (const volatile unsigned char *)0x00190000u, i = 0; i < 0x70000u; i++) if (p[i] == 'N' && p[i + 1] == 'A' && p[i + 2] == 'M' && p[i + 3] == ' ' && p[i + 4] == 'M' && p[i + 5] == 'E' && p[i + 6] == 'S') return 0x00190000u + i;
     return 0;
 }
-static void names_probe(void)
+static void names_probe(void)                  /* shows what sits at the place the scan found: 5 x 16 characters, then the slot byte of this preset */
 {
-    char s[40]; int n = 0, k; unsigned a = find_names(), d; unsigned div = 1000000000u;
-    gfx_rrect(-2, 118, 164, 12, 0, (rgb_t){0, 0, 0}, 0.9f); s[n++] = 'n'; s[n++] = ':';
-    if (!a) s[n++] = '0'; else { for (k = 0; k < 10; k++) { d = a / div % 10; if (d || n > 2 || div == 1) s[n++] = '0' + d; div /= 10; if (!div) break; } }
-    s[n++] = ' '; s[n++] = 's'; s[n++] = ':'; s[n++] = '0' + M[0x244 + 9] / 10 % 10; s[n++] = '0' + M[0x244 + 9] % 10; s[n] = 0;
-    gfx_text(2, 123, s, &FONT7, (rgb_t){255, 255, 255}, "lm", 1);
+    char s[24]; int row, i; const volatile unsigned char *p = (const volatile unsigned char *)0x2001BC12u;
+    gfx_rrect(-2, 88, 164, 42, 0, (rgb_t){0, 0, 0}, 0.92f);
+    for (row = 0; row < 5; row++) { for (i = 0; i < 16; i++) { unsigned char c = p[row * 16 + i]; s[i] = c >= 32 && c < 127 ? c : '.'; } s[16] = 0; gfx_text(2, 92 + 6.6f * row, s, &FONT7, (rgb_t){255, 255, 255}, "lm", 1); }
+    s[0] = 's'; s[1] = ' '; s[2] = '0' + M[0x244 + 9] / 10 % 10; s[3] = '0' + M[0x244 + 9] % 10; s[4] = 0; gfx_text(2, 92 + 6.6f * 5, s, &FONT7, (rgb_t){255, 255, 255}, "lm", 1);
 }
 __attribute__((section(".text.hook"))) void ui_hook(int x1, int x2, int y1, int y2, u16 *px)
 {
@@ -291,7 +290,7 @@ __attribute__((section(".text.hook"))) void ui_hook(int x1, int x2, int y1, int 
             if (ys > 0 && y1 <= 13) ys = 0;
             if (ys > 13) { gfx_begin(0, 159, 0, 13, buf, UITH); page_home(&m); FLUSH(0, 159, 0, 13, buf); }   /* the header (Bluetooth, volume, battery) refreshes on every update, wherever the original draws */
             for (y = ys; y <= ye; y += SH) { int e = y + SH - 1 > ye ? ye : y + SH - 1;
-                gfx_begin(0, 159, y, e, buf, UITH); page_home(&m); if (y + SH > 118) names_probe(); FLUSH(0, 159, y, e, buf); }
+                gfx_begin(0, 159, y, e, buf, UITH); page_home(&m); if (y + SH > 88) names_probe(); FLUSH(0, 159, y, e, buf); }
             FREE(buf); gfx_bind(old); return;
         }
         gfx_begin(x1, x2, y1, y2, px, UITH); page_home(&m);

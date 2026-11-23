@@ -40,8 +40,9 @@ void page_home(const model_t *m)
 {
     const theme_t *t = gfx_theme(); char b[16]; static const char *const lab[9] = {"NR", "FX1", "DRV", "AMP", "IR", "EQ", "FX2", "DLY", "RVB"};
     gfx_bg();
-    { float r[5]; int f = m->hfocus; if (m->hg) { r[0] = m->hgx; r[1] = m->hgy; r[2] = m->hgw; r[3] = m->hgh; r[4] = m->hgr; } else if (f >= 0 && f <= 2) home_focus_rect(m, f, r); else f = -1;
-      if (m->hg || f >= 0) gfx_rring(r[0], r[1], r[2], r[3], r[4], 1.8f, t->ring, 1); }          /* what the encoder controls */
+    float fr[5]; int fon = 0;                                                                         /* what the encoder controls: a soft glow behind + a clear outline on top */
+    { int f = m->hfocus; if (m->hg) { fr[0] = m->hgx; fr[1] = m->hgy; fr[2] = m->hgw; fr[3] = m->hgh; fr[4] = m->hgr; fon = 1; } else if (f >= 0 && f <= 2) { home_focus_rect(m, f, fr); fon = 1; }
+      if (fon) gfx_rrect(fr[0], fr[1], fr[2], fr[3], fr[4], t->ring, 0.40f); }
     if (m->bt >= 0) { gfx_pill(3, 2, 24, 10, "BT", &FONT7, m->bt, m->bt ? t->ring : t->track); if (m->bt) gfx_disc(8, 7, 1.8f, t->on, 1); }
     if (m->vol >= 0) { speaker(31, 2, t->text); gfx_bar(43, 5, 40, 5, m->vol / 100.0f, t->ring); num(b, m->vol, ""); gfx_text(86, 7.5f, b, &FONT7, t->text, "lm", 1); }
     if (m->bat >= 0) { battery(138, 2, m->bat, m->chg); }
@@ -58,4 +59,5 @@ void page_home(const model_t *m)
         gfx_text(x + 13, y + 27, (k == 3 && m->nam) ? "NAM" : lab[k], &FONT7, lit ? t->text : t->sub, "mt", lit ? 1 : 0.55f);
     }
     load_rings(143, 101, m->cpu, m->eng);
+    if (fon) gfx_rring(fr[0], fr[1], fr[2], fr[3], fr[4], 2.0f, t->text, 1);
 }

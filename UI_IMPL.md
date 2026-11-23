@@ -226,3 +226,9 @@ ui6 (float gfx, state on stack + r10, -ffixed-$r10) stable: the hang was the RAM
   0..1 (0.79 = 79); Bluetooth on = byte 0x20005800 (0/1; 0xFF in 0x200084B8/B9 = "never connected" at boot); the encoder's
   focus on the home screen = settings +0x10 (2 = default; mapping 0 BT / 1 volume / 2 preset is a guess from the manual's order).
   The home window's key list (0x22xxx): turn 0x22D58, push 0x22590, long 0x22578 - untouched, they still work under our page.
+- Home focus (settings +0x10, saved with the settings: the setter also sets the dirty flag): push cycles 0 -> 1 -> 2 -> 0
+  (handler 0x22590); the turn handler (0x22D58) edits what it points at: 0 = Bluetooth (turn right = on, left = off, via
+  0x52144), 1 = master volume (float at settings +0x0A via 0x4FF4C), 2 = preset (0x5022C / 0x50230). Confirmed by the code.
+- Clone names: a scan found the text "NAM MES Recto" at 0x2001BC12 (RAM) - the clone slot list is 5 flags + 5 x 16 chars
+  (reply 12 24 = 85 bytes) so slot k name = 0x2001BC12 + 16 k IF the table is contiguous there (to be confirmed on screen);
+  the preset's clone slot index is the byte at settings +0x244+9 (reads 4 on the test preset = the empty slot 5).
