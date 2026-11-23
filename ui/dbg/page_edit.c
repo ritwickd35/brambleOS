@@ -14,7 +14,7 @@ static void ring(float x, float y, float w, float h, float r, int ed) { const th
 void page_edit(const model_t *m)
 {
     const theme_t *t = gfx_theme(); char b[24]; int sel = m->sel < 0 ? 0 : m->sel, on = m->on[sel], k = m->ekind; float sx = 0, sy = 0;
-    rgb_t trk = t->dark ? rgbf(t->bg1, RGB(10, 0, 14), 0.66f) : rgbf(t->bg1, t->text, 0.26f);        /* inactive part: dark */
+    rgb_t trk = t->dark ? rgbf(t->bg1, RGB(10, 0, 14), 0.40f) : rgbf(t->bg1, t->text, 0.26f);        /* inactive part: dark */
     rgb_t act = t->dark ? rgbf(t->ring, RGB(255, 255, 255), 0.38f) : t->ring;                        /* active part: bright */
     int ed = m->nav == 0 || m->eopen;                                                                /* the highlighted item is being edited (else only hovered) */
     gfx_bg();
@@ -35,7 +35,7 @@ void page_edit(const model_t *m)
     int ms = k == 2 && ed;                                                                         /* model box selected and being edited: solid */
     if (k == 2) { if (ms) gfx_rrect(46, 46, 72, 31, 6, t->ring, 1); else gfx_rring(45.5f, 45.5f, 73, 32, 6.5f, 1.5f, t->ring, 1); }
     gfx_text(50, 50, LAB[sel], &FONT7, ms ? t->ink : t->sub, "lm", 1);
-    { const font_t *nf = gfx_text_w(&FONT16, m->mname) <= 66 ? &FONT16 : gfx_text_w(&FONT14, m->mname) <= 66 ? &FONT14 : &FONT11; gfx_text(50, 60.5f, m->mname, nf, ms ? t->ink : t->text, "lm", 1); }
+    { const font_t *nf = gfx_text_w(&FONT14, m->mname) <= 66 ? &FONT14 : &FONT11; gfx_text(50, 60.5f, m->mname, nf, ms ? t->ink : t->text, "lm", 1); }   /* regular weight: the name must not shout */
     if (m->brand[0]) gfx_text(50, 71.5f, m->brand, &FONT7, ms ? t->ink : t->sub, "lm", 1);
     gfx_pill(122, 48, 30, 13, on ? "ON" : "OFF", &FONT9, on, on ? t->on : t->track);
     if (m->pulse > 0) gfx_rring(122 - 2.2f * m->pulse, 48 - 2.2f * m->pulse, 30 + 4.4f * m->pulse, 13 + 4.4f * m->pulse, 6.5f + 2.2f * m->pulse, 1.8f, on ? t->on : t->sub, 0.9f - 0.27f * m->pulse);

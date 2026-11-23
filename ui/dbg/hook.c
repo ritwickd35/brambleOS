@@ -197,20 +197,27 @@ void tuner_sig(void *ctx, unsigned w0, unsigned w1, unsigned w2, unsigned w3, un
     paint(page_tuner, &m, 14, 127);
 }
 void tuner_nosig(void *ctx) { model_t m; (void)ctx; m.note = -1; m.a4 = 0; m.mute = 0; m.cents = 0; m.hz10 = 0; m.octave = 0; paint(page_tuner, &m, 14, 127); }
-/* DEBUG (home): the bytes next to the volume/brightness in the pedal's settings block, and four status bytes, to find Bluetooth */
+/* DEBUG (stock home screen, bottom): 4 rows of live bytes to find the Bluetooth / volume state.
+ * row 1: settings block +0E..+15, row 2: +16..+1D, row 3: status block B0..B7, row 4: B8, B9, encoder focus, volume (rounded) */
 static void dbg_home(void)
 {
-    static const unsigned ext[4] = {0x200084B2u, 0x200084B4u, 0x200084B7u, 0x20005800u}; char s[40]; int n, i, row;
-    gfx_rrect(-2, -2, 164, 27, 0, (rgb_t){0, 0, 0}, 0.88f);
-    for (row = 0; row < 3; row++) { n = 0;
-        for (i = 0; i < 8; i++) { unsigned v = row < 2 ? M[0x0E + row * 8 + i] : (i < 4 ? *(volatile unsigned char *)ext[i] : 0); if (row == 2 && i >= 4) break;
+    char s[48]; int n, i, row; unsigned v;
+    gfx_rrect(-2, 95, 164, 34, 0, (rgb_t){0, 0, 0}, 0.88f);
+    for (row = 0; row < 4; row++) { n = 0;
+        for (i = 0; i < 8; i++) {
+            if (row < 2) v = M[0x0E + row * 8 + i];
+            else if (row == 2) v = *(volatile unsigned char *)(0x200084B0u + i);
+            else { if (i >= 4) break;
+                if (i < 2) v = *(volatile unsigned char *)(0x200084B8u + i); else if (i == 2) v = *(volatile unsigned char *)0x20005800u;
+                else { union { unsigned u; float f; } x; x.u = M[0x0A] | (M[0x0B] << 8) | (M[0x0C] << 16) | ((unsigned)M[0x0D] << 24); v = x.f >= 0.0f && x.f < 1000.0f ? (unsigned)(x.f + 0.5f) : 999; } }
             if (v >= 100) s[n++] = '0' + v / 100; if (v >= 10) s[n++] = '0' + (v / 10) % 10; s[n++] = '0' + v % 10; s[n++] = ' '; }
-        s[n] = 0; gfx_text(2, 4 + 8 * row, s, &FONT7, (rgb_t){255, 255, 255}, "lm", 1); }
+        s[n] = 0; gfx_text(2, 99.5f + 8 * row, s, &FONT7, (rgb_t){255, 255, 255}, "lm", 1); }
 }
+#define OUR_HOME 0                                      /* 1 = the Berry home page; 0 = the original, whose encoder cycles Bluetooth / volume / preset */
 __attribute__((section(".text.hook"))) void ui_hook(int x1, int x2, int y1, int y2, u16 *px)
 {
     long long ctxbuf[4]; void *old = gfx_bind(ctxbuf);
-    if (WIN == 2) {
+    if (WIN == 2 && OUR_HOME) {
         /* The stock code flushes only the areas its own widgets changed, laid out differently from ours. Repaint, full
          * width, every band of our layout (header, preset row, block row 1, block row 2 + load) that the area touches. */
         static const unsigned char zs[4] = {0, 14, 39, 85}, ze[4] = {13, 38, 84, 127};
@@ -224,10 +231,12 @@ __attribute__((section(".text.hook"))) void ui_hook(int x1, int x2, int y1, int 
         if (buf) {
             if (ys > 0 && y1 <= 13) ys = 0;
             for (y = ys; y <= ye; y += SH) { int e = y + SH - 1 > ye ? ye : y + SH - 1;
-                gfx_begin(0, 159, y, e, buf, UITH); page_home(&m); if (y < 25) dbg_home(); FLUSH(0, 159, y, e, buf); }
+                gfx_begin(0, 159, y, e, buf, UITH); page_home(&m); FLUSH(0, 159, y, e, buf); }
             FREE(buf); gfx_bind(old); return;
         }
         gfx_begin(x1, x2, y1, y2, px, UITH); page_home(&m);
+    } else if (WIN == 2) {
+        gfx_begin(x1, x2, y1, y2, px, UITH); if (y2 >= 95) dbg_home();                              /* original home screen + the probe at the bottom */
     } else if (WIN == 3) {
         gfx_bind(old); if (y1 <= 13) tuner_nosig(0);                                                  /* page entry: header + empty gauge */
         return;

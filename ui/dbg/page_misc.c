@@ -5,7 +5,7 @@
  *   1 not selected: plain card        2 selected: thin accent outline        3 selected and being edited: solid accent, dark text
  * Controls: list (< name >), level bar (dark track, bright fill, value), on/off switch (green when on). */
 static char *itoa4(int v, char *s) { char t[12]; int n = 0; if (v < 0) { *s++ = '-'; v = -v; } do { t[n++] = '0' + v % 10; v /= 10; } while (v); for (int i = 0; i < n; i++) s[i] = t[n - 1 - i]; s[n] = 0; return s + n; }
-static rgb_t trk(const theme_t *t) { return t->dark ? rgbf(t->bg1, RGB(10, 0, 14), 0.66f) : rgbf(t->bg1, t->text, 0.26f); }
+static rgb_t trk(const theme_t *t) { return t->dark ? rgbf(t->bg1, RGB(10, 0, 14), 0.40f) : rgbf(t->bg1, t->text, 0.26f); }
 static rgb_t act(const theme_t *t) { return t->dark ? rgbf(t->ring, RGB(255, 255, 255), 0.38f) : t->ring; }
 static int editing(const model_t *m) { return m->nav == 0 || m->eopen; }
 static int st(const model_t *m, int sel, int i) { return sel != i ? 0 : editing(m) ? 2 : 1; }          /* UX state of item i when item `sel` is selected */
