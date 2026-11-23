@@ -29,13 +29,20 @@ static void load_rings(float cx, float cy, int cpu, int eng)
     else { char b[8]; ring(cx, cy, 8.5f, cpu, cc); if (cpu >= 0) { num(b, cpu, ""); gfx_text(cx, cy, b, &FONT7, t->text, "mm", 1); } }   /* engine load not available: one ring, value inside */
     gfx_text(cx, 118, eng >= 0 ? "LOAD" : "CPU", &FONT7, (cpu > 84 || eng > 84) ? t->warn : t->sub, "mm", 1);
 }
+void home_focus_rect(const model_t *m, int f, float *r)
+{
+    if (f == 0) { r[0] = 1.5f; r[1] = 0.5f; r[2] = 28; r[3] = 13; r[4] = 6.5f; }
+    else if (f == 1) { r[0] = 29; r[1] = 0.5f; r[2] = 79; r[3] = 13; r[4] = 6.5f; }
+    else { const font_t *fn = gfx_text_w(&FONT16, m->name) <= 104 ? &FONT16 : &FONT12; float tot = 36 + 4 + gfx_text_w(fn, m->name), x0 = (160 - tot) * 0.5f; if (x0 < 2) x0 = 2;
+        r[0] = x0 - 4; r[1] = 15; r[2] = tot + 8; r[3] = 22; r[4] = 11; }
+}
 void page_home(const model_t *m)
 {
     const theme_t *t = gfx_theme(); char b[16]; static const char *const lab[9] = {"NR", "FX1", "DRV", "AMP", "IR", "EQ", "FX2", "DLY", "RVB"};
     gfx_bg();
-    if (m->hfocus == 0) gfx_rring(1.5f, 0.5f, 28, 13, 6.5f, 1.8f, t->ring, 1);                                    /* the encoder controls Bluetooth */
+    { float r[5]; int f = m->hfocus; if (m->hg) { r[0] = m->hgx; r[1] = m->hgy; r[2] = m->hgw; r[3] = m->hgh; r[4] = m->hgr; } else if (f >= 0 && f <= 2) home_focus_rect(m, f, r); else f = -1;
+      if (m->hg || f >= 0) gfx_rring(r[0], r[1], r[2], r[3], r[4], 1.8f, t->ring, 1); }          /* what the encoder controls */
     if (m->bt >= 0) { gfx_pill(3, 2, 24, 10, "BT", &FONT7, m->bt, m->bt ? t->ring : t->track); if (m->bt) gfx_disc(8, 7, 1.8f, t->on, 1); }
-    if (m->hfocus == 1) gfx_rring(29, 0.5f, 66, 13, 6.5f, 1.8f, t->ring, 1);                                    /* ... or the volume */
     if (m->vol >= 0) { speaker(31, 2, t->text); gfx_bar(43, 5, 40, 5, m->vol / 100.0f, t->ring); num(b, m->vol, ""); gfx_text(86, 7.5f, b, &FONT7, t->text, "lm", 1); }
     if (m->bat >= 0) { battery(138, 2, m->bat, m->chg); }
     /* preset row: arrow + P-pill + name, centred as one group */

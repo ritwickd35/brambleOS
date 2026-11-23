@@ -10,13 +10,18 @@ static const char *const LAB[9] = {"NR", "FX1", "DRV", "AMP", "IR", "EQ", "FX2",
 static const rgb_t GC[9] = {{40, 90, 170}, {40, 140, 80}, {200, 50, 50}, {220, 170, 60}, {70, 60, 50}, {60, 55, 70}, {190, 130, 40}, {50, 130, 220}, {140, 90, 210}};
 static void itoa2(int v, char *s) { char t[12]; int n = 0; if (v < 0) v = 0; do { t[n++] = '0' + v % 10; v /= 10; } while (v); for (int i = 0; i < n; i++) s[i] = t[n - 1 - i]; s[n] = 0; }
 static rgb_t dim(rgb_t c, const theme_t *t) { int l = (c.r * 3 + c.g * 6 + c.b) / 10; l = t->dark ? l * 27 / 100 + 31 : l * 28 / 100 + 112; return RGB(l, l * 9 / 10, l); }
-static void ring(float x, float y, float w, float h, float r, int ed) { const theme_t *t = gfx_theme(); gfx_rring(x - 2, y - 2, w + 4, h + 4, r + 2, ed ? 2.4f : 1.6f, t->ring, 1); }
+void edit_item_rect(int kind, int ks, float *r)
+{
+    if (kind == 2) { r[0] = 46; r[1] = 46; r[2] = 72; r[3] = 31; r[4] = 6; }
+    else if (kind == 3) { r[0] = 117; r[1] = 62; r[2] = 36; r[3] = 14; r[4] = 7; }
+    else { r[0] = 22 + 39 * (ks % 4) - 18; r[1] = 81; r[2] = 36; r[3] = 40; r[4] = 8; }
+}
 void page_edit(const model_t *m)
 {
     const theme_t *t = gfx_theme(); char b[24]; int sel = m->sel < 0 ? 0 : m->sel, on = m->on[sel], k = m->ekind; float sx = 0, sy = 0;
     rgb_t trk = t->dark ? rgbf(t->bg1, RGB(10, 0, 14), 0.40f) : rgbf(t->bg1, t->text, 0.26f);        /* inactive part: dark */
     rgb_t act = t->dark ? rgbf(t->ring, RGB(255, 255, 255), 0.38f) : t->ring;                        /* active part: bright */
-    int ed = m->nav == 0 || m->eopen;                                                                /* the highlighted item is being edited (else only hovered) */
+    int ed = (m->nav == 0 || m->eopen) && !m->glide;                                                                /* the highlighted item is being edited (else only hovered) */
     gfx_bg();
     /* header */
     b[0] = 'P'; b[1] = '0' + (m->preset / 10) % 10; b[2] = '0' + m->preset % 10; b[3] = 0;
@@ -33,19 +38,20 @@ void page_edit(const model_t *m)
     gfx_rrect(4, 45, 152, 33, 7, t->dark ? RGB(20, 0, 24) : t->text, t->dark ? 0.30f : 0.07f);
     gfx_tile(8, 48, 26, 26, on, 0, 6); sprite(sel, 7, 48.5f, on, sel == 3 ? m->nam : 0);
     int ms = k == 2 && ed;                                                                         /* model box selected and being edited: solid */
-    if (k == 2) { if (ms) gfx_rrect(46, 46, 72, 31, 6, t->ring, 1); else gfx_rring(45.5f, 45.5f, 73, 32, 6.5f, 1.5f, t->ring, 1); }
+    { float hr[5]; int has = 0;                                                                    /* the highlight: one rectangle, which can glide from item to item */
+      if (m->glide) { hr[0] = m->gx; hr[1] = m->gy; hr[2] = m->gw; hr[3] = m->gh; hr[4] = m->gr; has = 1; }
+      else if (k == 2 || (k == 3 && sel == 3) || (k == 0 && m->ksel >= 0)) { edit_item_rect(k, k == 0 ? m->ksel : 0, hr); has = 1; }
+      if (has) { if (ed) gfx_rrect(hr[0], hr[1], hr[2], hr[3], hr[4], t->ring, 1); else gfx_rring(hr[0] - 0.5f, hr[1] - 0.5f, hr[2] + 1, hr[3] + 1, hr[4] + 0.5f, 1.7f, t->ring, 1); } }
     gfx_text(50, 50, LAB[sel], &FONT7, ms ? t->ink : t->sub, "lm", 1);
     { const font_t *nf = gfx_text_w(&FONT14, m->mname) <= 66 ? &FONT14 : &FONT11; gfx_text(50, 60.5f, m->mname, nf, ms ? t->ink : t->text, "lm", 1); }   /* regular weight: the name must not shout */
     if (m->brand[0]) gfx_text(50, 71.5f, m->brand, &FONT7, ms ? t->ink : t->sub, "lm", 1);
     gfx_pill(122, 48, 30, 13, on ? "ON" : "OFF", &FONT9, on, on ? t->on : t->track);
     if (m->pulse > 0) gfx_rring(122 - 2.2f * m->pulse, 48 - 2.2f * m->pulse, 30 + 4.4f * m->pulse, 13 + 4.4f * m->pulse, 6.5f + 2.2f * m->pulse, 1.8f, on ? t->on : t->sub, 0.9f - 0.27f * m->pulse);
-    if (sel == 3) { if (k == 3) ring(118, 63, 34, 12, 6, ed);
+    if (sel == 3) {
         gfx_rrect(118, 63, 34, 12, 6, trk, 1); gfx_rrect(m->nam ? 135 : 119, 64, 16, 10, 5, act, 1);
         gfx_text(127, 69, "B", &FONT7, m->nam ? t->sub : t->ink, "mm", 1); gfx_text(143, 69, "N", &FONT7, m->nam ? t->ink : t->sub, "mm", 1); }
     /* controls: 4 per page, taller rings, bigger numbers and names; on/off knobs are switches (green when on) */
     int page = (k == 0 && m->ksel > 0) ? m->ksel / 4 : 0, n = m->nk - page * 4; if (n > 4) n = 4;
-    if (k == 0 && m->ksel >= page * 4 && m->ksel < page * 4 + 4) { float hx = (m->hlx > 0 ? m->hlx : 22 + 39 * (m->ksel - page * 4)) - 18;
-        if (ed) gfx_rrect(hx, 81, 36, 40, 8, t->ring, 1); else gfx_rring(hx, 81, 36, 40, 8, 1.6f, t->ring, 1); }       /* selected + editing: solid; selected only: outline */
     for (int c = 0; c < n; c++) { int i = page * 4 + c, hl = k == 0 && i == m->ksel, sold = hl && ed; float cx = 22 + 39 * c, cy = 98;
         rgb_t tk = sold ? rgbf(t->ring, RGB(0, 0, 0), 0.4f) : trk, fl = sold ? t->ink : act, tx = sold ? t->ink : hl ? t->text : t->sub;
         if (m->kmx[i] == 1) {

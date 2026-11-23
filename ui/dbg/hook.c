@@ -9,7 +9,7 @@ typedef void (*flush_fn)(int, int, int, int, u16 *);
  * 0 dark + push-next, 1 light + push-next, 2 dark + select-then-edit, 3 light + select-then-edit (4, 5 = like 2, 3). */
 /* TEMPORARY: the CFW Display page showed no theme selector on the test pedal, so the look is fixed: dark, push-next navigation. */
 #define UITH (&THEMES[0])
-#define NAVMODE 0
+#define NAVMODE 1
 #define MALLOC ((void *(*)(unsigned))0x68D38)
 #define FREE ((void (*)(void *))0x68D64)
 #define SH 16                                              /* strip height: 160 x 16 x 2 = 5 KB, freed after every repaint */
@@ -97,7 +97,7 @@ typedef int (*kh_t)(void *, unsigned *);
 #define O_LONG ((kh_t)0x1C0ECu)
 static const float EASE[3] = {0.4f, 0.75f, 0.93f};      /* ease-out steps for the 3 in-between frames */
 #define DELAY ((void (*)(unsigned))0x687CCu)                    /* task delay in ms: paces the animation frames */
-static void edit_state(model_t *m) { read_model(m); read_edit(m); m->hlx = m->rgx = m->rgy = 0; m->pulse = 0; m->nav = NAVMODE; }
+static void edit_state(model_t *m) { read_model(m); read_edit(m); m->hlx = m->rgx = m->rgy = 0; m->pulse = 0; m->glide = 0; m->hg = 0; m->nav = NAVMODE; }
 static void paint(void (*pg)(const model_t *), const model_t *m, int ya, int yb)
 {
     long long cb[4]; void *old = gfx_bind(cb); u16 *buf = (u16 *)MALLOC(160 * 8 * 2); int y, ye;
@@ -123,10 +123,23 @@ static void set_item(const model_t *m, int idx, int open)
 {
     int ex = m->sel == 3; if (idx == 0) goto_item(m, 2, 0, open); else if (ex && idx == 1) goto_item(m, 3, 0, open); else goto_item(m, 0, idx - 1 - ex, open);
 }
-static void glide(model_t *m, int ok, int oks)                 /* the highlight glides between two knobs on the same page */
+static int item_rect(const model_t *m, int kind, int ks, float *r)
 {
-    int f; if (ok == 0 && m->ekind == 0 && oks != m->ksel && oks / 4 == m->ksel / 4) {
-        float x0 = 22 + 39 * (oks % 4), x1 = 22 + 39 * (m->ksel % 4); for (f = 0; f < 3; f++) { m->hlx = x0 + (x1 - x0) * EASE[f]; edit_paint(m, 80, 127); DELAY(12); } m->hlx = 0; }
+    if (kind == 0 && ks >= 0 && ks < m->nk) { edit_item_rect(0, ks, r); return 1; }
+    if (kind == 2) { edit_item_rect(2, 0, r); return 1; }
+    if (kind == 3 && m->sel == 3) { edit_item_rect(3, 0, r); return 1; }
+    return 0;
+}
+static void glide(model_t *m, int ok, int oks)                 /* every move of the highlight glides (3 short frames) */
+{
+    float a[5], b[5]; int f, y0, y1;
+    if (!item_rect(m, ok, oks, a) || !item_rect(m, m->ekind, m->ksel, b)) return;
+    if (ok == 0 && m->ekind == 0 && oks / 4 != m->ksel / 4) return;                                   /* another page of knobs: no glide */
+    if (a[0] == b[0] && a[1] == b[1]) return;
+    y0 = (int)(a[1] < b[1] ? a[1] : b[1]) - 3; y1 = (int)(a[1] + a[3] > b[1] + b[3] ? a[1] + a[3] : b[1] + b[3]) + 3; if (y0 < 0) y0 = 0; if (y1 > 127) y1 = 127;
+    for (f = 0; f < 3; f++) { m->glide = 1; m->gx = a[0] + (b[0] - a[0]) * EASE[f]; m->gy = a[1] + (b[1] - a[1]) * EASE[f]; m->gw = a[2] + (b[2] - a[2]) * EASE[f];
+        m->gh = a[3] + (b[3] - a[3]) * EASE[f]; m->gr = a[4] + (b[4] - a[4]) * EASE[f]; edit_paint(m, y0, y1); DELAY(12); }
+    m->glide = 0;
 }
 static int k_push(void *c, unsigned *msg)
 {
@@ -227,10 +240,43 @@ static void probe_paint(void)
     gfx_bind(old);
 }
 #define OUR_HOME 1                                      /* 1 = the Berry home page; 0 = the original, whose encoder cycles Bluetooth / volume / preset */
+/* ---- Home: the encoder's push cycles Bluetooth / volume / preset; the focus ring glides to the new place ---- */
+#define O_HPUSH ((kh_t)0x22590u)
+static int h_push(void *c, unsigned *msg)
+{
+    model_t m; int of = M[0x10], nf, r, f, i; float a[5], b[5];
+    r = O_HPUSH(c, msg); nf = M[0x10]; read_model(&m);
+    if (of <= 2 && nf <= 2 && of != nf) { home_focus_rect(&m, of, a); home_focus_rect(&m, nf, b);
+        for (f = 0; f < 3; f++) { m.hg = 1; m.hgx = a[0] + (b[0] - a[0]) * EASE[f]; m.hgy = a[1] + (b[1] - a[1]) * EASE[f]; m.hgw = a[2] + (b[2] - a[2]) * EASE[f];
+            m.hgh = a[3] + (b[3] - a[3]) * EASE[f]; m.hgr = a[4] + (b[4] - a[4]) * EASE[f]; paint(page_home, &m, 0, 38); DELAY(12); }
+        m.hg = 0; paint(page_home, &m, 0, 38); }
+    (void)i; return r;
+}
+static void home_keys(void)
+{
+    int i, n = KN; for (i = 0; i < n && i < 128; i++) if (KT[2 * i] == 0x30202u && KT[2 * i + 1] == 0x22590u) KT[2 * i + 1] = (unsigned)h_push;
+}
+/* DEBUG: where does the pedal keep the clone slot names? Scan RAM and the flash window for the first capture's name. */
+static unsigned find_names(void)
+{
+    const volatile unsigned char *p; unsigned i;
+    for (p = (const volatile unsigned char *)0x20000000u, i = 0; i < 0x1C800u; i++) if (p[i] == 'N' && p[i + 1] == 'A' && p[i + 2] == 'M' && p[i + 3] == ' ' && p[i + 4] == 'M' && p[i + 5] == 'E' && p[i + 6] == 'S') return 0x20000000u + i;
+    for (p = (const volatile unsigned char *)0x00190000u, i = 0; i < 0x70000u; i++) if (p[i] == 'N' && p[i + 1] == 'A' && p[i + 2] == 'M' && p[i + 3] == ' ' && p[i + 4] == 'M' && p[i + 5] == 'E' && p[i + 6] == 'S') return 0x00190000u + i;
+    return 0;
+}
+static void names_probe(void)
+{
+    char s[40]; int n = 0, k; unsigned a = find_names(), d; unsigned div = 1000000000u;
+    gfx_rrect(-2, 118, 164, 12, 0, (rgb_t){0, 0, 0}, 0.9f); s[n++] = 'n'; s[n++] = ':';
+    if (!a) s[n++] = '0'; else { for (k = 0; k < 10; k++) { d = a / div % 10; if (d || n > 2 || div == 1) s[n++] = '0' + d; div /= 10; if (!div) break; } }
+    s[n++] = ' '; s[n++] = 's'; s[n++] = ':'; s[n++] = '0' + M[0x244 + 9] / 10 % 10; s[n++] = '0' + M[0x244 + 9] % 10; s[n] = 0;
+    gfx_text(2, 123, s, &FONT7, (rgb_t){255, 255, 255}, "lm", 1);
+}
 __attribute__((section(".text.hook"))) void ui_hook(int x1, int x2, int y1, int y2, u16 *px)
 {
     long long ctxbuf[4]; void *old = gfx_bind(ctxbuf);
     if (WIN == 2 && OUR_HOME) {
+        home_keys();
         /* The stock code flushes only the areas its own widgets changed, laid out differently from ours. Repaint, full
          * width, every band of our layout (header, preset row, block row 1, block row 2 + load) that the area touches. */
         static const unsigned char zs[4] = {0, 14, 39, 85}, ze[4] = {13, 38, 84, 127};
@@ -245,7 +291,7 @@ __attribute__((section(".text.hook"))) void ui_hook(int x1, int x2, int y1, int 
             if (ys > 0 && y1 <= 13) ys = 0;
             if (ys > 13) { gfx_begin(0, 159, 0, 13, buf, UITH); page_home(&m); FLUSH(0, 159, 0, 13, buf); }   /* the header (Bluetooth, volume, battery) refreshes on every update, wherever the original draws */
             for (y = ys; y <= ye; y += SH) { int e = y + SH - 1 > ye ? ye : y + SH - 1;
-                gfx_begin(0, 159, y, e, buf, UITH); page_home(&m); FLUSH(0, 159, y, e, buf); }
+                gfx_begin(0, 159, y, e, buf, UITH); page_home(&m); if (y + SH > 118) names_probe(); FLUSH(0, 159, y, e, buf); }
             FREE(buf); gfx_bind(old); return;
         }
         gfx_begin(x1, x2, y1, y2, px, UITH); page_home(&m);

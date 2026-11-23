@@ -12,6 +12,8 @@ typedef struct {
     /* edit page (selected block = sel) */
     char mname[20], brand[24]; int nk; char kn[8][6]; int kv[8], kmx[8], kraw[8]; int ksel;   /* kv = 0..100 %, kmx = range top, kraw = raw value */   /* model, maker/original, knobs 0..100 */
     /* tuner */
+    int glide; float gx, gy, gw, gh, gr;                                     /* edit page: the highlight is drawn at this rectangle while it glides to the next item */
+    int hg; float hgx, hgy, hgw, hgh, hgr;                                   /* home: the same for the focus ring */
     float hlx, rgx, rgy; int pulse;                                          /* animation overrides (0 = none): knob highlight x, chain ring x/y, on/off pulse 1..3 */
     int nav;                                                                 /* edit page navigation: 0 push = next item, 1 turn = select / push = edit */
     int erow, ecol, eopen; int ekind;                                         /* ekind: 0 knob (ksel), 1 on/off, 2 model, 3 mode */                                                   /* edit page cursor: row (0 = block, 1.. = knob rows), column, open */
@@ -28,6 +30,8 @@ typedef struct {
 } model_t;
 void page_home(const model_t *m);
 void page_edit(const model_t *m);
+void edit_item_rect(int kind, int ks, float *r);                              /* highlight rectangle of an edit-page item: x, y, w, h, radius */
+void home_focus_rect(const model_t *m, int f, float *r);                      /* focus ring of the home page: 0 Bluetooth, 1 volume, 2 preset */
 void page_tuner(const model_t *m);
 void page_rec(const model_t *m);
 void page_drum(const model_t *m);
