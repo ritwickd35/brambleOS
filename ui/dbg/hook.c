@@ -197,21 +197,32 @@ void tuner_sig(void *ctx, unsigned w0, unsigned w1, unsigned w2, unsigned w3, un
     paint(page_tuner, &m, 14, 127);
 }
 void tuner_nosig(void *ctx) { model_t m; (void)ctx; m.note = -1; m.a4 = 0; m.mute = 0; m.cents = 0; m.hz10 = 0; m.octave = 0; paint(page_tuner, &m, 14, 127); }
-/* DEBUG (stock home screen, bottom): 4 rows of live bytes to find the Bluetooth / volume state.
- * row 1: settings block +0E..+15, row 2: +16..+1D, row 3: status block B0..B7, row 4: B8, B9, encoder focus, volume (rounded) */
-static void dbg_home(void)
+/* DEBUG (stock home screen, bottom): 5 rows of live bytes to find the Bluetooth / volume state. It repaints itself on every
+ * update of the screen, so a change anywhere is seen at once.
+ * rows 1-3: settings block +08..+1F (+08/09 preset, +0A..0D the volume float, +0E language, +0F brightness)
+ * row 4: status block B0..B7, row 5: B8, B9, encoder focus, byte 179E8, volume float x 100 (rounded) */
+static unsigned probe_val(int row, int i)
 {
-    char s[48]; int n, i, row; unsigned v;
-    gfx_rrect(-2, 95, 164, 34, 0, (rgb_t){0, 0, 0}, 0.88f);
-    for (row = 0; row < 4; row++) { n = 0;
-        for (i = 0; i < 8; i++) {
-            if (row < 2) v = M[0x0E + row * 8 + i];
-            else if (row == 2) v = *(volatile unsigned char *)(0x200084B0u + i);
-            else { if (i >= 4) break;
-                if (i < 2) v = *(volatile unsigned char *)(0x200084B8u + i); else if (i == 2) v = *(volatile unsigned char *)0x20005800u;
-                else { union { unsigned u; float f; } x; x.u = M[0x0A] | (M[0x0B] << 8) | (M[0x0C] << 16) | ((unsigned)M[0x0D] << 24); v = x.f >= 0.0f && x.f < 1000.0f ? (unsigned)(x.f + 0.5f) : 999; } }
-            if (v >= 100) s[n++] = '0' + v / 100; if (v >= 10) s[n++] = '0' + (v / 10) % 10; s[n++] = '0' + v % 10; s[n++] = ' '; }
-        s[n] = 0; gfx_text(2, 99.5f + 8 * row, s, &FONT7, (rgb_t){255, 255, 255}, "lm", 1); }
+    union { unsigned u; float f; } x; x.u = M[0x0A] | (M[0x0B] << 8) | (M[0x0C] << 16) | ((unsigned)M[0x0D] << 24);
+    if (row < 3) return M[0x08 + row * 8 + i];
+    if (row == 3) return *(volatile unsigned char *)(0x200084B0u + i);
+    if (i < 2) return *(volatile unsigned char *)(0x200084B8u + i);
+    if (i == 2) return *(volatile unsigned char *)0x20005800u;
+    if (i == 3) return *(volatile unsigned char *)0x200179E8u;
+    return x.f > -1000.0f && x.f < 1000.0f ? (unsigned)(x.f * 100.0f + 0.5f) : 99999;
+}
+static void probe_paint(void)
+{
+    long long cb[4]; void *old = gfx_bind(cb); u16 *buf = (u16 *)MALLOC(160 * 8 * 2); int y, row, i, n; char s[56];
+    if (buf) { for (y = 91; y < 128; y += 8) { int ye = y + 7 > 127 ? 127 : y + 7; gfx_begin(0, 159, y, ye, buf, UITH);
+            gfx_rrect(-2, y - 1, 164, 10, 0, (rgb_t){0, 0, 0}, 1);
+            for (row = 0; row < 5; row++) { unsigned v; n = 0;
+                for (i = 0; i < (row == 4 ? 5 : 8); i++) { v = probe_val(row, i);
+                    if (v >= 10000) s[n++] = '0' + v / 10000 % 10; if (v >= 1000) s[n++] = '0' + v / 1000 % 10; if (v >= 100) s[n++] = '0' + v / 100 % 10; if (v >= 10) s[n++] = '0' + (v / 10) % 10; s[n++] = '0' + v % 10; s[n++] = ' '; }
+                s[n] = 0; gfx_text(2, 95 + 7.4f * row, s, &FONT7, (rgb_t){255, 255, 255}, "lm", 1); }
+            FLUSH(0, 159, y, ye, buf); }
+        FREE(buf); }
+    gfx_bind(old);
 }
 #define OUR_HOME 0                                      /* 1 = the Berry home page; 0 = the original, whose encoder cycles Bluetooth / volume / preset */
 __attribute__((section(".text.hook"))) void ui_hook(int x1, int x2, int y1, int y2, u16 *px)
@@ -236,7 +247,7 @@ __attribute__((section(".text.hook"))) void ui_hook(int x1, int x2, int y1, int 
         }
         gfx_begin(x1, x2, y1, y2, px, UITH); page_home(&m);
     } else if (WIN == 2) {
-        gfx_begin(x1, x2, y1, y2, px, UITH); if (y2 >= 95) dbg_home();                              /* original home screen + the probe at the bottom */
+        ;                                                                                              /* original home screen; the probe is painted after it */
     } else if (WIN == 3) {
         gfx_bind(old); if (y1 <= 13) tuner_nosig(0);                                                  /* page entry: header + empty gauge */
         return;
@@ -249,4 +260,5 @@ __attribute__((section(".text.hook"))) void ui_hook(int x1, int x2, int y1, int 
     }
     gfx_bind(old);
     FLUSH(x1, x2, y1, y2, px);
+    if (WIN == 2 && !OUR_HOME) probe_paint();
 }
