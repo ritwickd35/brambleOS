@@ -20,6 +20,7 @@ typedef void (*flush_fn)(int, int, int, int, u16 *);
 static void read_model(model_t *m)
 {
     unsigned en = M[0x5F] | (M[0x60] << 8) | (M[0x61] << 16) | ((unsigned)M[0x62] << 24); int i;
+    m->hg = 0; m->glide = 0; m->hlx = m->rgx = m->rgy = 0; m->pulse = 0; m->nav = NAVMODE;                 /* no animation unless a caller sets one */
     m->preset = (M[8] | (M[9] << 8)) + 1; m->edited = 0; m->vol = m->bt = m->bat = m->cpu = m->eng = m->bpm = -1; m->chg = 0;
     for (i = 0; i < 23 && M[0x51 + i] >= 32 && M[0x51 + i] < 127; i++) m->name[i] = M[0x51 + i];
     m->name[i] = 0;
@@ -256,20 +257,24 @@ static void home_keys(void)
 {
     int i, n = KN; for (i = 0; i < n && i < 128; i++) if (KT[2 * i] == 0x30202u && KT[2 * i + 1] == 0x22590u) KT[2 * i + 1] = (unsigned)h_push;
 }
-/* DEBUG: where does the pedal keep the clone slot names? Scan RAM and the flash window for the first capture's name. */
-static unsigned find_names(void)
+/* DEBUG: where does the pedal keep the clone slot names? For each of the three capture names: the first two matches in RAM and the first in the flash window (decimal) */
+static unsigned scan(const char *pat, int len, unsigned start, unsigned size, int nth)
 {
-    const volatile unsigned char *p; unsigned i;
-    for (p = (const volatile unsigned char *)0x20000000u, i = 0; i < 0x1C800u; i++) if (p[i] == 'N' && p[i + 1] == 'A' && p[i + 2] == 'M' && p[i + 3] == ' ' && p[i + 4] == 'M' && p[i + 5] == 'E' && p[i + 6] == 'S') return 0x20000000u + i;
-    for (p = (const volatile unsigned char *)0x00190000u, i = 0; i < 0x70000u; i++) if (p[i] == 'N' && p[i + 1] == 'A' && p[i + 2] == 'M' && p[i + 3] == ' ' && p[i + 4] == 'M' && p[i + 5] == 'E' && p[i + 6] == 'S') return 0x00190000u + i;
+    const volatile unsigned char *p = (const volatile unsigned char *)start; unsigned i; int j;
+    for (i = 0; i + len < size; i++) { if (p[i] != (unsigned char)pat[0]) continue; for (j = 1; j < len && p[i + j] == (unsigned char)pat[j]; j++) ; if (j == len && nth-- == 0) return start + i; }
     return 0;
 }
-static void names_probe(void)                  /* shows what sits at the place the scan found: 5 x 16 characters, then the slot byte of this preset */
+static int put_dec(char *s, unsigned v) { char t[12]; int n = 0, i; if (!v) { s[0] = '0'; return 1; } while (v) { t[n++] = '0' + v % 10; v /= 10; } for (i = 0; i < n; i++) s[i] = t[n - 1 - i]; return n; }
+static void names_probe(void)
 {
-    char s[24]; int row, i; const volatile unsigned char *p = (const volatile unsigned char *)0x2001BC12u;
-    gfx_rrect(-2, 88, 164, 42, 0, (rgb_t){0, 0, 0}, 0.92f);
-    for (row = 0; row < 5; row++) { for (i = 0; i < 16; i++) { unsigned char c = p[row * 16 + i]; s[i] = c >= 32 && c < 127 ? c : '.'; } s[16] = 0; gfx_text(2, 92 + 6.6f * row, s, &FONT7, (rgb_t){255, 255, 255}, "lm", 1); }
-    s[0] = 's'; s[1] = ' '; s[2] = '0' + M[0x244 + 9] / 10 % 10; s[3] = '0' + M[0x244 + 9] % 10; s[4] = 0; gfx_text(2, 92 + 6.6f * 5, s, &FONT7, (rgb_t){255, 255, 255}, "lm", 1);
+    static const char *const nm[3] = {"NAM MES Recto", "NAM SuperReverb", "NAM JCM800 amp"}; char s[56]; int row, n;
+    gfx_rrect(-2, 100, 164, 30, 0, (rgb_t){0, 0, 0}, 0.92f);
+    for (row = 0; row < 3; row++) { int len = 0; while (nm[row][len]) len++; n = 0;
+        n += put_dec(s + n, scan(nm[row], len, 0x20000000u, 0x1C800u, 0)); s[n++] = ' ';
+        n += put_dec(s + n, scan(nm[row], len, 0x20000000u, 0x1C800u, 1)); s[n++] = ' ';
+        n += put_dec(s + n, scan(nm[row], len, 0x00190000u, 0x70000u, 0)); s[n] = 0;
+        gfx_text(2, 104 + 8 * row, s, &FONT7, (rgb_t){255, 255, 255}, "lm", 1); }
+    s[0] = 's'; s[1] = ' '; s[2] = '0' + M[0x244 + 9] / 10 % 10; s[3] = '0' + M[0x244 + 9] % 10; s[4] = 0; gfx_text(130, 124, s, &FONT7, (rgb_t){255, 255, 255}, "lm", 1);
 }
 __attribute__((section(".text.hook"))) void ui_hook(int x1, int x2, int y1, int y2, u16 *px)
 {
@@ -290,7 +295,7 @@ __attribute__((section(".text.hook"))) void ui_hook(int x1, int x2, int y1, int 
             if (ys > 0 && y1 <= 13) ys = 0;
             if (ys > 13) { gfx_begin(0, 159, 0, 13, buf, UITH); page_home(&m); FLUSH(0, 159, 0, 13, buf); }   /* the header (Bluetooth, volume, battery) refreshes on every update, wherever the original draws */
             for (y = ys; y <= ye; y += SH) { int e = y + SH - 1 > ye ? ye : y + SH - 1;
-                gfx_begin(0, 159, y, e, buf, UITH); page_home(&m); if (y + SH > 88) names_probe(); FLUSH(0, 159, y, e, buf); }
+                gfx_begin(0, 159, y, e, buf, UITH); page_home(&m); if (y + SH > 100) names_probe(); FLUSH(0, 159, y, e, buf); }
             FREE(buf); gfx_bind(old); return;
         }
         gfx_begin(x1, x2, y1, y2, px, UITH); page_home(&m);
