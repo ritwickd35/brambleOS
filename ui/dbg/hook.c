@@ -7,8 +7,9 @@ typedef void (*flush_fn)(int, int, int, int, u16 *);
 #define FLUSH ((flush_fn)0x50BE8)
 /* Until our own Settings page exists, the CFW's theme setting (Settings > Display) selects our look and edit-page navigation:
  * 0 dark + push-next, 1 light + push-next, 2 dark + select-then-edit, 3 light + select-then-edit (4, 5 = like 2, 3). */
-#define UITH (&THEMES[*(volatile unsigned char *)0x2001BB88u & 1])
-#define NAVMODE (*(volatile unsigned char *)0x2001BB88u >= 2)
+/* TEMPORARY: the CFW Display page showed no theme selector on the test pedal, so the look is fixed: dark, push-next navigation. */
+#define UITH (&THEMES[0])
+#define NAVMODE 0
 #define MALLOC ((void *(*)(unsigned))0x68D38)
 #define FREE ((void (*)(void *))0x68D64)
 #define SH 16                                              /* strip height: 160 x 16 x 2 = 5 KB, freed after every repaint */
