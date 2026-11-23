@@ -32,7 +32,7 @@ static void load_rings(float cx, float cy, int cpu, int eng)
 void home_focus_rect(const model_t *m, int f, float *r)
 {
     if (f == 0) { r[0] = 1.5f; r[1] = 0.5f; r[2] = 28; r[3] = 13; r[4] = 6.5f; }
-    else if (f == 1) { r[0] = 29; r[1] = 0.5f; r[2] = 79; r[3] = 13; r[4] = 6.5f; }
+    else if (f == 1) { r[0] = 40; r[1] = 0.5f; r[2] = 81; r[3] = 13; r[4] = 6.5f; }
     else { const font_t *fn = gfx_text_w(&FONT16, m->name) <= 104 ? &FONT16 : &FONT12; float tot = 36 + 4 + gfx_text_w(fn, m->name), x0 = (160 - tot) * 0.5f; if (x0 < 2) x0 = 2;
         r[0] = x0 - 4; r[1] = 15; r[2] = tot + 8; r[3] = 22; r[4] = 11; }
 }
@@ -42,9 +42,10 @@ void page_home(const model_t *m)
     gfx_bg();
     float fr[5]; int fon = 0;                                                                         /* what the encoder controls: a soft glow behind + a clear outline on top */
     { int f = m->hfocus; if (m->hg) { fr[0] = m->hgx; fr[1] = m->hgy; fr[2] = m->hgw; fr[3] = m->hgh; fr[4] = m->hgr; fon = 1; } else if (f >= 0 && f <= 2) { home_focus_rect(m, f, fr); fon = 1; }
-      if (fon) gfx_rrect(fr[0], fr[1], fr[2], fr[3], fr[4], t->ring, 0.40f); }
-    if (m->bt >= 0) { gfx_pill(3, 2, 24, 10, "BT", &FONT7, m->bt, m->bt ? t->ring : t->track); if (m->bt) gfx_disc(8, 7, 1.8f, t->on, 1); }
-    if (m->vol >= 0) { speaker(31, 2, t->text); gfx_bar(43, 5, 40, 5, m->vol / 100.0f, t->ring); num(b, m->vol, ""); gfx_text(86, 7.5f, b, &FONT7, t->text, "lm", 1); }
+      if (fon) gfx_rrect(fr[0], fr[1], fr[2], fr[3], fr[4], t->ring, 0.30f); }
+    if (m->bt >= 0) { gfx_pill(3, 2, 24, 10, "", &FONT7, m->bt, m->bt ? t->ring : t->track);
+          { float wb = gfx_text_w(&FONT7, "B"), wt = gfx_text_w(&FONT7, "T"), x0 = 16.5f - (wb + wt - 1) * 0.5f; rgb_t c = m->bt ? t->ink : t->sub; gfx_text(x0, 7, "B", &FONT7, c, "lm", 1); gfx_text(x0 + wb - 1, 7, "T", &FONT7, c, "lm", 1); } if (m->bt) gfx_disc(8, 7, 1.8f, t->on, 1); }
+    if (m->vol >= 0) { speaker(42, 2, t->text); gfx_bar(54, 5, 40, 5, m->vol / 100.0f, t->ring); num(b, m->vol, ""); gfx_text(97, 7.5f, b, &FONT7, t->text, "lm", 1); }
     if (m->bat >= 0) { battery(138, 2, m->bat, m->chg); }
     /* preset row: arrow + P-pill + name, centred as one group */
     { char p[4] = "P"; p[1] = '0' + (m->preset / 10) % 10; p[2] = '0' + m->preset % 10; p[3] = 0;
@@ -59,5 +60,5 @@ void page_home(const model_t *m)
         gfx_text(x + 13, y + 27, (k == 3 && m->nam) ? "NAM" : lab[k], &FONT7, lit ? t->text : t->sub, "mt", lit ? 1 : 0.55f);
     }
     load_rings(143, 101, m->cpu, m->eng);
-    if (fon) gfx_rring(fr[0], fr[1], fr[2], fr[3], fr[4], 2.0f, t->text, 1);
+    if (fon) gfx_rring(fr[0], fr[1], fr[2], fr[3], fr[4], 1.2f, t->text, 1);
 }

@@ -70,7 +70,10 @@ static void read_edit(model_t *m)
     const unsigned char *r = db_rec(g, M[0x244 + mod]);
     if (!r || r[8] == 0 || r[8] > 12) return;
     const unsigned char *sb = r + 16 + 24 * r[8];
-    cpy(m->mname, sb, sizeof m->mname); if (mod == 9) { const char *t = "NAM capture"; for (k = 0; t[k]; k++) m->brand[k] = t[k]; m->brand[k] = 0; }
+    cpy(m->mname, sb, sizeof m->mname);
+    if (mod == 9) { const char *t = "NAM capture"; unsigned slot = M[0x244 + 9]; const unsigned char *np = (const unsigned char *)(0x2001BC12u + 72u * slot);
+        for (k = 0; t[k]; k++) m->brand[k] = t[k]; m->brand[k] = 0;
+        if (slot < 10 && np[0] >= 32 && np[0] < 127) cpy(m->mname, np, 17); }          /* the loaded capture's name: slot names sit 72 bytes apart (measured) */
     for (k = 0; k < r[8] && k < 8; k++) {
         const unsigned char *kr = r + 16 + 24 * k; unsigned noff = kr[2] | (kr[3] << 8);
         float mn = f32(rd32(kr + 4)), mx = f32(rd32(kr + 8)), v = PGET(mod, k);                       /* the pedal's own knob -> value mapping */
@@ -265,16 +268,14 @@ static unsigned scan(const char *pat, int len, unsigned start, unsigned size, in
     return 0;
 }
 static int put_dec(char *s, unsigned v) { char t[12]; int n = 0, i; if (!v) { s[0] = '0'; return 1; } while (v) { t[n++] = '0' + v % 10; v /= 10; } for (i = 0; i < n; i++) s[i] = t[n - 1 - i]; return n; }
-static void names_probe(void)
+static void names_probe(void)                  /* the names table as the edit page reads it: slots 1..6, 72 bytes apart, plus this preset's slot */
 {
-    static const char *const nm[3] = {"NAM MES Recto", "NAM SuperReverb", "NAM JCM800 amp"}; char s[56]; int row, n;
-    gfx_rrect(-2, 100, 164, 30, 0, (rgb_t){0, 0, 0}, 0.92f);
-    for (row = 0; row < 3; row++) { int len = 0; while (nm[row][len]) len++; n = 0;
-        n += put_dec(s + n, scan(nm[row], len, 0x20000000u, 0x1C800u, 0)); s[n++] = ' ';
-        n += put_dec(s + n, scan(nm[row], len, 0x20000000u, 0x1C800u, 1)); s[n++] = ' ';
-        n += put_dec(s + n, scan(nm[row], len, 0x00190000u, 0x70000u, 0)); s[n] = 0;
-        gfx_text(2, 104 + 8 * row, s, &FONT7, (rgb_t){255, 255, 255}, "lm", 1); }
-    s[0] = 's'; s[1] = ' '; s[2] = '0' + M[0x244 + 9] / 10 % 10; s[3] = '0' + M[0x244 + 9] % 10; s[4] = 0; gfx_text(130, 124, s, &FONT7, (rgb_t){255, 255, 255}, "lm", 1);
+    char s[24]; int row, i; unsigned slot = M[0x244 + 9];
+    gfx_rrect(-2, 88, 164, 42, 0, (rgb_t){0, 0, 0}, 0.92f);
+    for (row = 0; row < 6; row++) { const volatile unsigned char *p = (const volatile unsigned char *)(0x2001BC12u + 72u * row);
+        s[0] = '1' + row; s[1] = ' ';
+        for (i = 0; i < 16; i++) { unsigned char c = p[i]; s[2 + i] = c >= 32 && c < 127 ? c : '.'; } s[18] = 0; gfx_text(2, 92 + 6.6f * row, s, &FONT7, (rgb_t){255, 255, 255}, "lm", 1); }
+    s[0] = 's'; s[1] = ' '; s[2] = '0' + slot / 10 % 10; s[3] = '0' + slot % 10; s[4] = 0; gfx_text(130, 124, s, &FONT7, (rgb_t){255, 255, 255}, "lm", 1);
 }
 __attribute__((section(".text.hook"))) void ui_hook(int x1, int x2, int y1, int y2, u16 *px)
 {
@@ -295,7 +296,7 @@ __attribute__((section(".text.hook"))) void ui_hook(int x1, int x2, int y1, int 
             if (ys > 0 && y1 <= 13) ys = 0;
             if (ys > 13) { gfx_begin(0, 159, 0, 13, buf, UITH); page_home(&m); FLUSH(0, 159, 0, 13, buf); }   /* the header (Bluetooth, volume, battery) refreshes on every update, wherever the original draws */
             for (y = ys; y <= ye; y += SH) { int e = y + SH - 1 > ye ? ye : y + SH - 1;
-                gfx_begin(0, 159, y, e, buf, UITH); page_home(&m); if (y + SH > 100) names_probe(); FLUSH(0, 159, y, e, buf); }
+                gfx_begin(0, 159, y, e, buf, UITH); page_home(&m); if (y + SH > 88) names_probe(); FLUSH(0, 159, y, e, buf); }
             FREE(buf); gfx_bind(old); return;
         }
         gfx_begin(x1, x2, y1, y2, px, UITH); page_home(&m);
