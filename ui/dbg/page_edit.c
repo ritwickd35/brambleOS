@@ -9,7 +9,7 @@
 static const char *const LAB[9] = {"NR", "FX1", "DRV", "AMP", "IR", "EQ", "FX2", "DLY", "RVB"};
 static const rgb_t GC[9] = {{40, 90, 170}, {40, 140, 80}, {200, 50, 50}, {220, 170, 60}, {70, 60, 50}, {60, 55, 70}, {190, 130, 40}, {50, 130, 220}, {140, 90, 210}};
 static void itoa2(int v, char *s) { char t[12]; int n = 0; if (v < 0) v = 0; do { t[n++] = '0' + v % 10; v /= 10; } while (v); for (int i = 0; i < n; i++) s[i] = t[n - 1 - i]; s[n] = 0; }
-static rgb_t dim(rgb_t c, const theme_t *t) { int l = (c.r * 3 + c.g * 6 + c.b) / 10; l = t->dark ? l * 24 / 100 + 28 : l * 28 / 100 + 112; return RGB(l, l * 9 / 10, l); }
+static rgb_t dim(rgb_t c, const theme_t *t) { int l = (c.r * 3 + c.g * 6 + c.b) / 10; l = t->dark ? l * 27 / 100 + 31 : l * 28 / 100 + 112; return RGB(l, l * 9 / 10, l); }
 static void ring(float x, float y, float w, float h, float r, int ed) { const theme_t *t = gfx_theme(); gfx_rring(x - 2, y - 2, w + 4, h + 4, r + 2, ed ? 2.4f : 1.6f, t->ring, 1); }
 void page_edit(const model_t *m)
 {
@@ -26,7 +26,7 @@ void page_edit(const model_t *m)
     for (int j = 0; j < 9; j++) { int i = m->order[j] < 9 ? m->order[j] : j, o = m->on[i]; float x = 4 + (j % 5) * 31, y = 13 + (j / 5) * 16; rgb_t c = o ? GC[i] : dim(GC[i], t);
         if (i == sel) { sx = x; sy = y; }
         gfx_rrect(x, y, 28, 13, 4, c, 1); if (o) gfx_rrect(x + 1, y + 1, 26, 5, 3, RGB(255, 255, 255), 0.18f);
-        gfx_text(x + 14, y + 7, LAB[i], &FONT9, o ? RGB(255, 255, 255) : (t->dark ? RGB(165, 140, 168) : RGB(236, 230, 236)), "mm", 1); }
+        gfx_text(x + 14, y + 7, LAB[i], &FONT9, o ? RGB(255, 255, 255) : (t->dark ? RGB(158, 134, 162) : RGB(236, 230, 236)), "mm", 1); }
     if (m->rgx > 0) { sx = m->rgx; sy = m->rgy; }
     gfx_rring(sx - 2.5f, sy - 2.5f, 33, 18, 6.5f, 2, t->ring, 1);
     /* model card (slim: the freed rows go to the controls) */

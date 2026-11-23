@@ -19,8 +19,12 @@ static ctx_t CTXV; static ctx_t *const CTXP = &CTXV;
 #define PX (CTX.px)
 #define RGB(r, g, b) ((rgb_t){r, g, b})
 const theme_t THEMES[] = {
- /* Mulberry */   {RGB(172, 112, 176), RGB(120, 70, 130), RGB(146, 92, 154), RGB(64, 34, 72), RGB(255, 248, 255), RGB(232, 214, 238), RGB(190, 140, 205), RGB(228, 176, 246), RGB(110, 215, 120), RGB(226, 64, 96), RGB(52, 26, 60), RGB(28, 10, 30), 1},
+ /* Mulberry */   {RGB(164, 104, 166), RGB(104, 58, 113), RGB(142, 89, 148), RGB(79, 44, 86), RGB(252, 243, 252), RGB(220, 199, 227), RGB(183, 130, 198), RGB(221, 168, 239), RGB(115, 208, 122), RGB(218, 58, 90), RGB(57, 29, 63), RGB(29, 11, 30), 1},
  /* Cloudberry */ {RGB(244, 234, 216), RGB(222, 204, 180), RGB(255, 252, 244), RGB(190, 176, 164), RGB(40, 18, 34), RGB(96, 70, 88), RGB(255, 255, 255), RGB(206, 102, 16), RGB(28, 140, 60), RGB(200, 40, 70), RGB(160, 140, 130), RGB(255, 250, 240), 0},
+#ifdef HOSTCMP     /* comparison only (host): 2 = first Mulberry, 3 = the high-contrast one */
+ {RGB(156, 96, 156), RGB(88, 46, 96), RGB(138, 86, 142), RGB(94, 54, 100), RGB(248, 238, 250), RGB(208, 184, 216), RGB(176, 120, 190), RGB(214, 160, 232), RGB(120, 200, 120), RGB(210, 52, 84), RGB(62, 32, 66), RGB(30, 12, 30), 1},
+ {RGB(172, 112, 176), RGB(120, 70, 130), RGB(146, 92, 154), RGB(64, 34, 72), RGB(255, 248, 255), RGB(232, 214, 238), RGB(190, 140, 205), RGB(228, 176, 246), RGB(110, 215, 120), RGB(226, 64, 96), RGB(52, 26, 60), RGB(28, 10, 30), 1},
+#endif
 };
 const theme_t *gfx_theme(void) { return (const theme_t *)T; }
 void gfx_begin(int x1, int x2, int y1, int y2, u16 *px, const theme_t *t) { X1 = x1; X2 = x2; Y1 = y1; Y2 = y2; PX = px; T = (const theme_t *)t; }

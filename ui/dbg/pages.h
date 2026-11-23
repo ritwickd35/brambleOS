@@ -19,6 +19,7 @@ typedef struct {
     /* drum machine */
     int dplay, dvol, dsel; char dtype[16];
     /* settings: one list page */
+    int spreview, slevel, sicon;                                             /* settings: bottom preview (0 none, 1 theme swatches, 2 input meter), live level 0..100 */
     const char *stitle; int spage, spages, ssel, sn; const char *slab[6]; const char *sval[6]; int skind[6], snum[6];   /* kind 0 text, 1 bar, 2 switch */
     const char *tabs[5]; int tsel;
     char dbg[24];                                                            /* debug text (edit page probe), empty = none */

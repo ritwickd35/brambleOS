@@ -27,6 +27,7 @@ static void read_model(model_t *m)
     { int n = 0, k; for (i = 0; i < 10 && n < 9; i++) { k = M[0x63 + i]; if (k < 9) m->order[n++] = k; }    /* chain order (getter 0x50280) */
       if (n != 9) for (i = 0; i < 9; i++) m->order[i] = i; }
     m->nam = (en >> 3) & (en >> 9) & 1; m->sel = -1;
+    { union { unsigned u; float f; } v; v.u = M[0x0A] | (M[0x0B] << 8) | (M[0x0C] << 16) | ((unsigned)M[0x0D] << 24); m->vol = v.f >= 0.0f && v.f <= 100.5f ? (int)(v.f + 0.5f) : -1; }   /* the float the stock home reads (getter 0x4FF48) */
     { unsigned lv = *(volatile unsigned char *)0x200084A9u; m->bat = (lv > 5 ? 5 : lv) * 20; }               /* battery level 0..5 (getter 0x14800) */
     m->chg = *(volatile unsigned char *)0x200084ACu == 2;                                                      /* 2 = USB power in */
     m->edited = *(volatile unsigned char *)0x2000D134u != 0;                                                   /* unsaved changes (stock draws its '*' from this) */
@@ -196,6 +197,16 @@ void tuner_sig(void *ctx, unsigned w0, unsigned w1, unsigned w2, unsigned w3, un
     paint(page_tuner, &m, 14, 127);
 }
 void tuner_nosig(void *ctx) { model_t m; (void)ctx; m.note = -1; m.a4 = 0; m.mute = 0; m.cents = 0; m.hz10 = 0; m.octave = 0; paint(page_tuner, &m, 14, 127); }
+/* DEBUG (home): the bytes next to the volume/brightness in the pedal's settings block, and four status bytes, to find Bluetooth */
+static void dbg_home(void)
+{
+    static const unsigned ext[4] = {0x200084B2u, 0x200084B4u, 0x200084B7u, 0x20005800u}; char s[40]; int n, i, row;
+    gfx_rrect(-2, -2, 164, 27, 0, (rgb_t){0, 0, 0}, 0.88f);
+    for (row = 0; row < 3; row++) { n = 0;
+        for (i = 0; i < 8; i++) { unsigned v = row < 2 ? M[0x0E + row * 8 + i] : (i < 4 ? *(volatile unsigned char *)ext[i] : 0); if (row == 2 && i >= 4) break;
+            if (v >= 100) s[n++] = '0' + v / 100; if (v >= 10) s[n++] = '0' + (v / 10) % 10; s[n++] = '0' + v % 10; s[n++] = ' '; }
+        s[n] = 0; gfx_text(2, 4 + 8 * row, s, &FONT7, (rgb_t){255, 255, 255}, "lm", 1); }
+}
 __attribute__((section(".text.hook"))) void ui_hook(int x1, int x2, int y1, int y2, u16 *px)
 {
     long long ctxbuf[4]; void *old = gfx_bind(ctxbuf);
@@ -213,7 +224,7 @@ __attribute__((section(".text.hook"))) void ui_hook(int x1, int x2, int y1, int 
         if (buf) {
             if (ys > 0 && y1 <= 13) ys = 0;
             for (y = ys; y <= ye; y += SH) { int e = y + SH - 1 > ye ? ye : y + SH - 1;
-                gfx_begin(0, 159, y, e, buf, UITH); page_home(&m); FLUSH(0, 159, y, e, buf); }
+                gfx_begin(0, 159, y, e, buf, UITH); page_home(&m); if (y < 25) dbg_home(); FLUSH(0, 159, y, e, buf); }
             FREE(buf); gfx_bind(old); return;
         }
         gfx_begin(x1, x2, y1, y2, px, UITH); page_home(&m);
