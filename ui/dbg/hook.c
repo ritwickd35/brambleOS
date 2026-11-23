@@ -5,6 +5,7 @@
 void *gfx_bind(void *c);
 typedef void (*flush_fn)(int, int, int, int, u16 *);
 #define FLUSH ((flush_fn)0x50BE8)
+#define UI_THEME 1                                      /* 0 = Mulberry (dark plum), 1 = Cloudberry (light) */
 #define MALLOC ((void *(*)(unsigned))0x68D38)
 #define FREE ((void (*)(void *))0x68D64)
 #define SH 16                                              /* strip height: 160 x 16 x 2 = 5 KB, freed after every repaint */
@@ -94,14 +95,14 @@ static void edit_state(model_t *m) { read_model(m); read_edit(m); m->hlx = m->rg
 static void paint(void (*pg)(const model_t *), const model_t *m, int ya, int yb)
 {
     long long cb[4]; void *old = gfx_bind(cb); u16 *buf = (u16 *)MALLOC(160 * 8 * 2); int y, ye;
-    if (buf) { for (y = ya; y <= yb; y += 8) { ye = y + 7 > yb ? yb : y + 7; gfx_begin(0, 159, y, ye, buf, &THEMES[0]); pg(m); FLUSH(0, 159, y, ye, buf); } FREE(buf); }
+    if (buf) { for (y = ya; y <= yb; y += 8) { ye = y + 7 > yb ? yb : y + 7; gfx_begin(0, 159, y, ye, buf, &THEMES[UI_THEME]); pg(m); FLUSH(0, 159, y, ye, buf); } FREE(buf); }
     gfx_bind(old);
 }
 #define edit_paint(m, a, b) paint(page_edit, m, a, b)
 static void edit_paint_r(const model_t *m, int xa, int xb, int ya, int yb)
 {
     long long cb[4]; void *old = gfx_bind(cb); int w = xb - xa + 1, y, ye; u16 *buf = (u16 *)MALLOC(w * 8 * 2);
-    if (buf) { for (y = ya; y <= yb; y += 8) { ye = y + 7 > yb ? yb : y + 7; gfx_begin(xa, xb, y, ye, buf, &THEMES[0]); page_edit(m); FLUSH(xa, xb, y, ye, buf); } FREE(buf); }
+    if (buf) { for (y = ya; y <= yb; y += 8) { ye = y + 7 > yb ? yb : y + 7; gfx_begin(xa, xb, y, ye, buf, &THEMES[UI_THEME]); page_edit(m); FLUSH(xa, xb, y, ye, buf); } FREE(buf); }
     gfx_bind(old);
 }
 static void goto_item(const model_t *m, int kind, int ks)    /* put the original's cursor on an item; open it unless on/off */
@@ -119,7 +120,7 @@ static int k_push(void *c, unsigned *msg)                    /* next item: knobs
     else { kind = m.nk ? 0 : 2; }
     { int ok = m.ekind, oks = m.ksel, f; goto_item(&m, kind, ks); edit_state(&m);
       if (ok == 0 && m.ekind == 0 && oks != m.ksel && oks / 4 == m.ksel / 4) {                        /* the highlight glides to the next knob */
-          float x0 = 22 + 39 * (oks % 4), x1 = 22 + 39 * (m.ksel % 4); for (f = 0; f < 3; f++) { m.hlx = x0 + (x1 - x0) * EASE[f]; edit_paint(&m, 85, 127); DELAY(12); } m.hlx = 0; }
+          float x0 = 22 + 39 * (oks % 4), x1 = 22 + 39 * (m.ksel % 4); for (f = 0; f < 3; f++) { m.hlx = x0 + (x1 - x0) * EASE[f]; edit_paint(&m, 80, 127); DELAY(12); } m.hlx = 0; }
       edit_paint(&m, 44, 127); return 0; }
 }
 static int k_turn(void *c, unsigned *msg)
@@ -131,9 +132,9 @@ static int k_turn(void *c, unsigned *msg)
     if (m.ekind == 0) {
         if (old >= 0 && old != m.kv[ks]) {                                                            /* the ring and number glide to the new value */
             int nv = m.kv[ks], nr = m.kraw[ks], x0 = 22 + 39 * (ks % 4) - 19;
-            for (i = 0; i < 3; i++) { m.kv[ks] = old + (int)((nv - old) * EASE[i]); m.kraw[ks] = oldr + (int)((nr - oldr) * EASE[i]); edit_paint_r(&m, x0, x0 + 38, 87, 124); DELAY(10); }
+            for (i = 0; i < 3; i++) { m.kv[ks] = old + (int)((nv - old) * EASE[i]); m.kraw[ks] = oldr + (int)((nr - oldr) * EASE[i]); edit_paint_r(&m, x0, x0 + 38, 81, 124); DELAY(10); }
             m.kv[ks] = nv; m.kraw[ks] = nr; }
-        edit_paint(&m, 0, 11); edit_paint(&m, 85, 127); return 0;
+        edit_paint(&m, 0, 11); edit_paint(&m, 80, 127); return 0;
     }
     edit_paint(&m, 0, 127); return 0;
 }
@@ -142,7 +143,7 @@ static int k_hold(void *c, unsigned *msg)                    /* hold the knob = 
     model_t m; int kind, ks; edit_state(&m); kind = m.ekind == 1 ? 0 : m.ekind; ks = m.ksel < 0 ? 0 : m.ksel;
     goto_item(&m, 1, 0); O_PUSH(c, msg); edit_state(&m);
     goto_item(&m, kind, ks); edit_state(&m);
-    { int f; for (f = 1; f <= 3; f++) { m.pulse = f; edit_paint_r(&m, 108, 159, 40, 82); DELAY(30); } m.pulse = 0; }      /* a ring ripples out from the on/off badge */
+    { int f; for (f = 1; f <= 3; f++) { m.pulse = f; edit_paint_r(&m, 108, 159, 38, 80); DELAY(30); } m.pulse = 0; }      /* a ring ripples out from the on/off badge */
     edit_paint(&m, 0, 127); return 0;
 }
 /* Block movement. The original stops at both ends and keeps a hidden clone slot after RVB; we skip that slot and wrap round. */
@@ -200,10 +201,10 @@ __attribute__((section(".text.hook"))) void ui_hook(int x1, int x2, int y1, int 
         if (buf) {
             if (ys > 0 && y1 <= 13) ys = 0;
             for (y = ys; y <= ye; y += SH) { int e = y + SH - 1 > ye ? ye : y + SH - 1;
-                gfx_begin(0, 159, y, e, buf, &THEMES[0]); page_home(&m); FLUSH(0, 159, y, e, buf); }
+                gfx_begin(0, 159, y, e, buf, &THEMES[UI_THEME]); page_home(&m); FLUSH(0, 159, y, e, buf); }
             FREE(buf); gfx_bind(old); return;
         }
-        gfx_begin(x1, x2, y1, y2, px, &THEMES[0]); page_home(&m);
+        gfx_begin(x1, x2, y1, y2, px, &THEMES[UI_THEME]); page_home(&m);
     } else if (WIN == 3) {
         gfx_bind(old); if (y1 <= 13) tuner_nosig(0);                                                  /* page entry: header + empty gauge */
         return;
