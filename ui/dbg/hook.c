@@ -71,9 +71,7 @@ static void read_edit(model_t *m)
     if (!r || r[8] == 0 || r[8] > 12) return;
     const unsigned char *sb = r + 16 + 24 * r[8];
     cpy(m->mname, sb, sizeof m->mname);
-    if (mod == 9) { const char *t = "NAM capture"; unsigned slot = M[0x244 + 9]; const unsigned char *np = (const unsigned char *)(0x2001BC12u + 72u * slot);
-        for (k = 0; t[k]; k++) m->brand[k] = t[k]; m->brand[k] = 0;
-        if (slot < 10 && np[0] >= 32 && np[0] < 127) cpy(m->mname, np, 17); }          /* the loaded capture's name: slot names sit 72 bytes apart (measured) */
+    if (mod == 9) { const char *t = "NAM capture"; for (k = 0; t[k]; k++) m->brand[k] = t[k]; m->brand[k] = 0; }
     for (k = 0; k < r[8] && k < 8; k++) {
         const unsigned char *kr = r + 16 + 24 * k; unsigned noff = kr[2] | (kr[3] << 8);
         float mn = f32(rd32(kr + 4)), mx = f32(rd32(kr + 8)), v = PGET(mod, k);                       /* the pedal's own knob -> value mapping */
@@ -260,26 +258,10 @@ static void home_keys(void)
 {
     int i, n = KN; for (i = 0; i < n && i < 128; i++) if (KT[2 * i] == 0x30202u && KT[2 * i + 1] == 0x22590u) KT[2 * i + 1] = (unsigned)h_push;
 }
-/* DEBUG: where does the pedal keep the clone slot names? For each of the three capture names: the first two matches in RAM and the first in the flash window (decimal) */
-static unsigned scan(const char *pat, int len, unsigned start, unsigned size, int nth)
-{
-    const volatile unsigned char *p = (const volatile unsigned char *)start; unsigned i; int j;
-    for (i = 0; i + len < size; i++) { if (p[i] != (unsigned char)pat[0]) continue; for (j = 1; j < len && p[i + j] == (unsigned char)pat[j]; j++) ; if (j == len && nth-- == 0) return start + i; }
-    return 0;
-}
-static int put_dec(char *s, unsigned v) { char t[12]; int n = 0, i; if (!v) { s[0] = '0'; return 1; } while (v) { t[n++] = '0' + v % 10; v /= 10; } for (i = 0; i < n; i++) s[i] = t[n - 1 - i]; return n; }
-static void names_probe(void)                  /* the names table as the edit page reads it: slots 1..6, 72 bytes apart, plus this preset's slot */
-{
-    char s[24]; int row, i; unsigned slot = M[0x244 + 9];
-    gfx_rrect(-2, 88, 164, 42, 0, (rgb_t){0, 0, 0}, 0.92f);
-    for (row = 0; row < 6; row++) { const volatile unsigned char *p = (const volatile unsigned char *)(0x2001BC12u + 72u * row);
-        s[0] = '1' + row; s[1] = ' ';
-        for (i = 0; i < 16; i++) { unsigned char c = p[i]; s[2 + i] = c >= 32 && c < 127 ? c : '.'; } s[18] = 0; gfx_text(2, 92 + 6.6f * row, s, &FONT7, (rgb_t){255, 255, 255}, "lm", 1); }
-    s[0] = 's'; s[1] = ' '; s[2] = '0' + slot / 10 % 10; s[3] = '0' + slot % 10; s[4] = 0; gfx_text(130, 124, s, &FONT7, (rgb_t){255, 255, 255}, "lm", 1);
-}
 __attribute__((section(".text.hook"))) void ui_hook(int x1, int x2, int y1, int y2, u16 *px)
 {
     long long ctxbuf[4]; void *old = gfx_bind(ctxbuf);
+    if (WIN != 2 && M[0x10] != 2) M[0x10] = 2;                                                           /* the encoder controls the preset again after boot / any other screen */
     if (WIN == 2 && OUR_HOME) {
         home_keys();
         /* The stock code flushes only the areas its own widgets changed, laid out differently from ours. Repaint, full
@@ -296,7 +278,7 @@ __attribute__((section(".text.hook"))) void ui_hook(int x1, int x2, int y1, int 
             if (ys > 0 && y1 <= 13) ys = 0;
             if (ys > 13) { gfx_begin(0, 159, 0, 13, buf, UITH); page_home(&m); FLUSH(0, 159, 0, 13, buf); }   /* the header (Bluetooth, volume, battery) refreshes on every update, wherever the original draws */
             for (y = ys; y <= ye; y += SH) { int e = y + SH - 1 > ye ? ye : y + SH - 1;
-                gfx_begin(0, 159, y, e, buf, UITH); page_home(&m); if (y + SH > 88) names_probe(); FLUSH(0, 159, y, e, buf); }
+                gfx_begin(0, 159, y, e, buf, UITH); page_home(&m); FLUSH(0, 159, y, e, buf); }
             FREE(buf); gfx_bind(old); return;
         }
         gfx_begin(x1, x2, y1, y2, px, UITH); page_home(&m);

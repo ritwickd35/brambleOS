@@ -22,6 +22,7 @@ float gfx_sin(float deg);
 void gfx_led(float x, float y, int on);
 int  gfx_text_w(const font_t *f, const char *s);
 void gfx_text(float x, float y, const char *s, const font_t *f, rgb_t c, const char *anchor, float a);
+void gfx_text_solid(float x, float y, const char *s, const font_t *f, rgb_t c, const char *anchor, float a);   /* heavier anti-aliasing: clearer on this screen */
 void gfx_pill(float x, float y, float w, float h, const char *s, const font_t *f, int on, rgb_t fill);
 rgb_t rgbf(rgb_t a, rgb_t b, float t);                                      /* mix */
 extern const theme_t THEMES[];

@@ -148,7 +148,7 @@ void gfx_tile(float x, float y, float w, float h, int lit, int sel, float r)
 }
 void gfx_led(float x, float y, int on) { if (!on) return; gfx_disc(x, y, 3.4f, T->on, 0.30f); gfx_disc(x, y, 1.9f, T->on, 1); gfx_disc(x - 0.5f, y - 0.6f, 0.8f, RGB(255, 255, 255), 0.6f); }
 int gfx_text_w(const font_t *f, const char *s) { int w = 0; for (; *s; s++) { int i = *s - f->first; if (i >= 0 && i < f->count) w += f->g[i].adv; } return w; }
-void gfx_text(float x, float y, const char *s, const font_t *f, rgb_t c, const char *anchor, float a)
+static void gtext(float x, float y, const char *s, const font_t *f, rgb_t c, const char *anchor, float a, int solid)   /* solid: heavier anti-aliasing (thin strokes read as dither on this screen) */
 {
     int w = gfx_text_w(f, s); float x0 = x, y0 = y;
     if (anchor[0] == 'm') x0 = x - w * 0.5f; else if (anchor[0] == 'r') x0 = x - w;
@@ -157,9 +157,11 @@ void gfx_text(float x, float y, const char *s, const font_t *f, rgb_t c, const c
     for (; *s; s++) { int gi = *s - f->first; if (gi < 0 || gi >= f->count) continue; const glyph_t *g = &f->g[gi];
         for (int j = 0; j < g->h; j++) { int py = cy + g->yo + j; if (py < Y1 || py > Y2) continue;
             for (int i = 0; i < g->w; i++) { int px = cx + g->xo + i; if (px < X1 || px > X2) continue; int k = j * g->w + i, q = (f->bits[g->off + (k >> 2)] >> (6 - 2 * (k & 3))) & 3;
-                if (q) put(px, py, c, (int)(q * 85 * a)); } }
+                if (q) put(px, py, c, (int)((solid ? (q == 1 ? 120 : q == 2 ? 215 : 255) : q * 85) * a)); } }
         cx += g->adv; }
 }
+void gfx_text(float x, float y, const char *s, const font_t *f, rgb_t c, const char *anchor, float a) { gtext(x, y, s, f, c, anchor, a, 0); }
+void gfx_text_solid(float x, float y, const char *s, const font_t *f, rgb_t c, const char *anchor, float a) { gtext(x, y, s, f, c, anchor, a, 1); }
 void gfx_pill(float x, float y, float w, float h, const char *s, const font_t *f, int on, rgb_t fill)
 {
     gfx_rrect(x, y, w, h, h * 0.5f, fill, 1); gfx_text(x + w * 0.5f, y + h * 0.5f, s, f, on ? T->ink : T->sub, "mm", 1);

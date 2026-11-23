@@ -232,3 +232,8 @@ ui6 (float gfx, state on stack + r10, -ffixed-$r10) stable: the hang was the RAM
 - Clone names: a scan found the text "NAM MES Recto" at 0x2001BC12 (RAM) - the clone slot list is 5 flags + 5 x 16 chars
   (reply 12 24 = 85 bytes) so slot k name = 0x2001BC12 + 16 k IF the table is contiguous there (to be confirmed on screen);
   the preset's clone slot index is the byte at settings +0x244+9 (reads 4 on the test preset = the empty slot 5).
+- Capture names (parked): the text of the capture names was found at 72-byte spacing in RAM at 0x2001BC12.., but only
+  transiently (the same addresses later held "Empty" / "None" / junk): it is a scratch list buffer, not the slot table.
+  Real source = the flash slot headers (CPU = flash + 0x10000; the area above 0x200000 was not scanned) or the code that
+  answers the USB request 12 24. Stride-72 arrays with 10 / 26 entries exist at 0x2001BC88 / 0x2001BF88 (CFW clone / cab
+  lists, name at +26): to examine when this is picked up again.
